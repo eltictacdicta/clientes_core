@@ -1,0 +1,209 @@
+{#
+/**
+ * Macros reutilizables para el dominio de clientes.
+ * Plugin: clientes_core
+ *
+ * Uso: {% import 'Macro/cliente_macros.html.twig' as cm %}
+ */
+#}
+
+{# Resumen compacto de un cliente (nombre + razón social si difiere) #}
+{% macro resumen_cliente(cliente) %}
+    {% if cliente %}
+        <span class="cliente-resumen">
+            <strong>{{ cliente.nombre }}</strong>
+            {% if cliente.nombre != cliente.razonsocial and cliente.razonsocial %}
+                <small class="text-muted">({{ cliente.razonsocial }})</small>
+            {% endif %}
+        </span>
+    {% endif %}
+{% endmacro %}
+
+{# Badge de estado del cliente (activo/de baja) #}
+{% macro badge_estado(cliente) %}
+    {% if cliente %}
+        {% if cliente.debaja %}
+            <span class="label label-danger"><i class="fa fa-ban"></i> {{ trans('cliente-de-baja') }}</span>
+        {% else %}
+            <span class="label label-success"><i class="fa fa-check"></i> {{ trans('cliente-activo') }}</span>
+        {% endif %}
+    {% endif %}
+{% endmacro %}
+
+{# Tabla de direcciones de un cliente #}
+{% macro tabla_direcciones(direcciones) %}
+<div class="table-responsive">
+    <table class="table table-hover table-condensed">
+        <thead>
+            <tr>
+                <th>{{ trans('descripcion-direccion') }}</th>
+                <th>{{ trans('direccion') }}</th>
+                <th>{{ trans('ciudad') }}</th>
+                <th>{{ trans('provincia') }}</th>
+                <th>{{ trans('codigo-postal') }}</th>
+                <th>{{ trans('pais') }}</th>
+                <th class="text-center">{{ trans('direccion-envio') }}</th>
+                <th class="text-center">{{ trans('direccion-facturacion') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for dir in direcciones %}
+            <tr>
+                <td>{{ dir.descripcion ?: '-' }}</td>
+                <td>{{ dir.direccion }}</td>
+                <td>{{ dir.ciudad ?: '-' }}</td>
+                <td>{{ dir.provincia ?: '-' }}</td>
+                <td>{{ dir.codpostal ?: '-' }}</td>
+                <td>{{ dir.codpais ?: '-' }}</td>
+                <td class="text-center">
+                    {% if dir.domenvio %}
+                        <i class="fa fa-check text-success"></i>
+                    {% endif %}
+                </td>
+                <td class="text-center">
+                    {% if dir.domfacturacion %}
+                        <i class="fa fa-check text-success"></i>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" class="text-center text-muted">{{ trans('sin-resultados') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endmacro %}
+
+{# Selector de grupo de clientes #}
+{% macro selector_grupo(grupos, grupo_actual) %}
+<select name="codgrupo" class="form-control">
+    <option value="">{{ trans('sin-grupo') }}</option>
+    {% for grupo in grupos %}
+    <option value="{{ grupo.codgrupo }}"{% if grupo_actual == grupo.codgrupo %} selected{% endif %}>
+        {{ grupo.nombre }}
+    </option>
+    {% endfor %}
+</select>
+{% endmacro %}
+
+{# Formulario base de datos del cliente (campos principales) #}
+{% macro form_datos_cliente(cliente, regimenes_iva) %}
+<div class="row">
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('codigo-cliente') }}</label>
+            <input type="text" name="codcliente" value="{{ cliente.codcliente }}" class="form-control" maxlength="6"
+                {% if cliente.codcliente %}readonly{% endif %} />
+        </div>
+    </div>
+    <div class="col-sm-5">
+        <div class="form-group">
+            <label>{{ trans('nombre-cliente') }} *</label>
+            <input type="text" name="nombre" value="{{ cliente.nombre }}" class="form-control" maxlength="100" required />
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="form-group">
+            <label>{{ trans('cifnif') }}</label>
+            <input type="text" name="cifnif" value="{{ cliente.cifnif }}" class="form-control" maxlength="30" />
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-6">
+        <div class="form-group">
+            <label>{{ trans('razonsocial') }}</label>
+            <input type="text" name="razonsocial" value="{{ cliente.razonsocial }}" class="form-control" maxlength="100" />
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('tipoidfiscal') }}</label>
+            <input type="text" name="tipoidfiscal" value="{{ cliente.tipoidfiscal }}" class="form-control" maxlength="25" />
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('persona-fisica') }}</label>
+            <select name="personafisica" class="form-control">
+                <option value="1"{% if cliente.personafisica %} selected{% endif %}>{{ trans('persona-fisica') }}</option>
+                <option value="0"{% if not cliente.personafisica %} selected{% endif %}>{{ trans('persona-juridica') }}</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('telefono1') }}</label>
+            <input type="text" name="telefono1" value="{{ cliente.telefono1 }}" class="form-control" maxlength="30" />
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('telefono2') }}</label>
+            <input type="text" name="telefono2" value="{{ cliente.telefono2 }}" class="form-control" maxlength="30" />
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('email') }}</label>
+            <input type="email" name="email" value="{{ cliente.email }}" class="form-control" maxlength="100" />
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('web') }}</label>
+            <input type="url" name="web" value="{{ cliente.web }}" class="form-control" maxlength="250" />
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('regimen-iva') }}</label>
+            <select name="regimeniva" class="form-control">
+                {% for regimen in regimenes_iva %}
+                <option value="{{ regimen }}"{% if cliente.regimeniva == regimen %} selected{% endif %}>{{ regimen }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('recargo-equivalencia') }}</label>
+            <select name="recargo" class="form-control">
+                <option value="0"{% if not cliente.recargo %} selected{% endif %}>No</option>
+                <option value="1"{% if cliente.recargo %} selected{% endif %}>{{ trans('recargo-equivalencia') }}</option>
+            </select>
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('dias-pago') }}</label>
+            <input type="text" name="diaspago" value="{{ cliente.diaspago }}" class="form-control" maxlength="10"
+                placeholder="1,15,31" />
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('fecha-alta') }}</label>
+            <input type="text" value="{{ cliente.fechaalta }}" class="form-control" readonly />
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-12">
+        <div class="form-group">
+            <label>{{ trans('observaciones') }}</label>
+            <textarea name="observaciones" class="form-control" rows="3">{{ cliente.observaciones }}</textarea>
+        </div>
+    </div>
+</div>
+{% endmacro %}

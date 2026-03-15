@@ -1,0 +1,122 @@
+{#
+/**
+ * Vista de listado de clientes.
+ * Plugin: clientes_core
+ * Twig nativo (no depende de legacy_support).
+ */
+#}
+{% import 'Macro/cliente_macros.html.twig' as cm %}
+
+{{ include('header.html.twig') }}
+
+<div class="container-fluid" style="margin-bottom: 10px;">
+    <div class="row">
+        <div class="col-sm-4">
+            <span class="btn-group">
+                <a class="btn btn-sm btn-default" href="{{ fsc.url() }}" title="{{ trans('recargar') }}">
+                    <i class="fa fa-refresh" aria-hidden="true"></i>
+                </a>
+            </span>
+            <a href="{{ fsc.url() }}&action=new" class="btn btn-sm btn-success">
+                <i class="fa fa-plus fa-fw" aria-hidden="true"></i>
+                <span class="hidden-xs">{{ trans('nuevo-cliente') }}</span>
+            </a>
+        </div>
+        <div class="col-sm-8 text-right">
+            <span class="h2">{{ trans('clientes') }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid" style="margin-bottom: 10px;">
+    <div class="row">
+        <div class="col-sm-4">
+            <form action="{{ fsc.url() }}" method="post" class="form-inline">
+                {{ csrf_field() }}
+                <div class="input-group">
+                    <input type="text" name="query" value="{{ fsc.query is defined ? fsc.query : '' }}"
+                        class="form-control" placeholder="{{ trans('buscar-cliente') }}" autocomplete="off" autofocus />
+                    <span class="input-group-btn">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="fa fa-search" aria-hidden="true"></i>
+                        </button>
+                    </span>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>{{ trans('codigo-cliente') }}</th>
+                <th>{{ trans('nombre-cliente') }}</th>
+                <th>{{ trans('cifnif') }}</th>
+                <th class="hidden-xs">{{ trans('telefono1') }}</th>
+                <th class="hidden-xs">{{ trans('email') }}</th>
+                <th class="hidden-xs">{{ trans('grupo-cliente') }}</th>
+                <th class="text-center">{{ trans('cliente-activo') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cliente in fsc.clientes is defined ? fsc.clientes : [] %}
+            <tr>
+                <td>
+                    <a href="{{ cliente.url() }}">{{ cliente.codcliente }}</a>
+                </td>
+                <td>
+                    <a href="{{ cliente.url() }}">{{ cm.resumen_cliente(cliente) }}</a>
+                </td>
+                <td>{{ cliente.cifnif ?: '-' }}</td>
+                <td class="hidden-xs">{{ cliente.telefono1 ?: '-' }}</td>
+                <td class="hidden-xs">
+                    {% if cliente.email %}
+                        <a href="mailto:{{ cliente.email }}">{{ cliente.email }}</a>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="hidden-xs">
+                    {% if cliente.codgrupo %}
+                        {{ cliente.codgrupo }}
+                    {% else %}
+                        <span class="text-muted">{{ trans('sin-grupo') }}</span>
+                    {% endif %}
+                </td>
+                <td class="text-center">{{ cm.badge_estado(cliente) }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="text-center text-muted">{{ trans('sin-resultados') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if fsc.clientes is defined and fsc.clientes|length >= constant('FS_ITEM_LIMIT') %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-sm-12 text-center">
+            <ul class="pagination">
+                {% if fsc.offset is defined and fsc.offset > 0 %}
+                <li>
+                    <a href="{{ fsc.url() }}&offset={{ fsc.offset - constant('FS_ITEM_LIMIT') }}">
+                        <i class="fa fa-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+                <li>
+                    <a href="{{ fsc.url() }}&offset={{ (fsc.offset is defined ? fsc.offset : 0) + constant('FS_ITEM_LIMIT') }}">
+                        <i class="fa fa-chevron-right"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{{ include('footer.html.twig') }}

@@ -1,0 +1,122 @@
+{#
+/**
+ * Vista de detalle/edición de un cliente.
+ * Plugin: clientes_core
+ * Twig nativo (no depende de legacy_support).
+ */
+#}
+{% import 'Macro/cliente_macros.html.twig' as cm %}
+
+{{ include('header.html.twig') }}
+
+{% set cliente = fsc.cliente is defined ? fsc.cliente : null %}
+
+{% if cliente %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-sm-6">
+            <div class="btn-group">
+                <a href="{{ fsc.url() }}&action=list" class="btn btn-sm btn-default">
+                    <i class="fa fa-chevron-left fa-fw" aria-hidden="true"></i>
+                    <span class="hidden-xs">{{ trans('volver') }}</span>
+                </a>
+                <a class="btn btn-sm btn-default" href="{{ cliente.url() }}" title="{{ trans('recargar') }}">
+                    <i class="fa fa-refresh" aria-hidden="true"></i>
+                </a>
+            </div>
+        </div>
+        <div class="col-sm-6 text-right">
+            <span class="h2">
+                {{ cm.resumen_cliente(cliente) }}
+                {{ cm.badge_estado(cliente) }}
+            </span>
+        </div>
+    </div>
+</div>
+
+<br/>
+
+{# Datos principales del cliente #}
+<div class="container-fluid">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="panel-title">
+                <i class="fa fa-user"></i> {{ trans('editar-cliente') }}
+            </h3>
+        </div>
+        <div class="panel-body">
+            <form action="{{ cliente.url() }}" method="post">
+                {{ csrf_field() }}
+                <input type="hidden" name="action" value="save_cliente" />
+
+                {{ cm.form_datos_cliente(cliente, fsc.regimenes_iva is defined ? fsc.regimenes_iva : ['General', 'Exento']) }}
+
+                <div class="row" style="margin-top: 15px;">
+                    <div class="col-xs-4">
+                        <button type="button" id="btn_delete_cliente" class="btn btn-sm btn-danger">
+                            <i class="fa fa-trash fa-fw" aria-hidden="true"></i>
+                            <span class="hidden-xs hidden-sm">{{ trans('eliminar') }}</span>
+                        </button>
+                    </div>
+                    <div class="col-xs-8 text-right">
+                        <a class="btn btn-sm btn-default" href="{{ cliente.url() }}" title="{{ trans('recargar') }}">
+                            <i class="fa fa-refresh fa-fw" aria-hidden="true"></i>
+                            <span class="hidden-xs hidden-sm">{{ trans('deshacer') }}</span>
+                        </a>
+                        <button class="btn btn-sm btn-primary" type="submit">
+                            <i class="fa fa-floppy-o fa-fw" aria-hidden="true"></i>
+                            <span class="hidden-xs">{{ trans('guardar') }}</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# Direcciones del cliente #}
+<div class="container-fluid">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="panel-title">
+                <i class="fa fa-map-marker"></i> {{ trans('direcciones') }}
+                <a href="{{ cliente.url() }}&action=new_dir" class="btn btn-xs btn-success pull-right">
+                    <i class="fa fa-plus"></i> {{ trans('nueva-direccion') }}
+                </a>
+            </h3>
+        </div>
+        <div class="panel-body">
+            {{ cm.tabla_direcciones(fsc.direcciones is defined ? fsc.direcciones : []) }}
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        $("#btn_delete_cliente").click(function (event) {
+            event.preventDefault();
+            bootbox.confirm({
+                message: '{{ trans("confirmar-eliminar") }}',
+                title: '<b>{{ trans("eliminar-cliente") }}</b>',
+                callback: function (result) {
+                    if (result) {
+                        window.location.href = '{{ cliente.url()|raw }}&action=delete';
+                    }
+                }
+            });
+        });
+    });
+</script>
+{% else %}
+<div class="container-fluid">
+    <div class="alert alert-warning">
+        <i class="fa fa-exclamation-triangle"></i>
+        {{ trans('sin-resultados') }}
+        <a href="index.php?page=ventas_clientes" class="btn btn-sm btn-default">
+            {{ trans('volver') }}
+        </a>
+    </div>
+</div>
+{% endif %}
+
+{{ include('footer.html.twig') }}

@@ -1,0 +1,394 @@
+{#
+/**
+ * Detalle y edición de un cliente.
+ * Plugin: clientes_core
+ * Twig nativo (no depende de legacy_support).
+ */
+#}
+
+{{ include('header.html.twig') }}
+
+{% if fsc.cliente %}
+{% set cliente = fsc.cliente %}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-sm-6">
+            <div class="btn-group">
+                <a href="index.php?page=ventas_clientes" class="btn btn-sm btn-default">
+                    <i class="fa fa-chevron-left fa-fw" aria-hidden="true"></i>
+                    <span class="hidden-xs">{{ trans('clientes') }}</span>
+                </a>
+                <a class="btn btn-sm btn-default" href="{{ cliente.url() }}" title="{{ trans('recargar') }}">
+                    <i class="fa fa-refresh" aria-hidden="true"></i>
+                </a>
+            </div>
+        </div>
+        <div class="col-sm-6 text-right">
+            <span class="h2">
+                {{ cliente.nombre }}
+                {% if cliente.debaja %}
+                    <span class="label label-danger">{{ trans('cliente-de-baja') }}</span>
+                {% endif %}
+            </span>
+        </div>
+    </div>
+</div>
+
+<br/>
+
+{# Datos principales del cliente #}
+<div class="container-fluid">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="panel-title">
+                <i class="fa fa-user"></i> {{ trans('editar-cliente') }}
+            </h3>
+        </div>
+        <div class="panel-body">
+            <form action="{{ cliente.url() }}" method="post">
+                {{ csrf_field() }}
+                <input type="hidden" name="action" value="save_cliente" />
+                <input type="hidden" name="codcliente" value="{{ cliente.codcliente }}" />
+
+                <div class="row">
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('codigo-cliente') }}</label>
+                            <input type="text" value="{{ cliente.codcliente }}" class="form-control" readonly />
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            <label>{{ trans('nombre-cliente') }} *</label>
+                            <input type="text" name="nombre" value="{{ cliente.nombre }}" class="form-control"
+                                maxlength="100" required />
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                            <label>{{ trans('razonsocial') }}</label>
+                            <input type="text" name="razonsocial" value="{{ cliente.razonsocial }}" class="form-control"
+                                maxlength="100" />
+                        </div>
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('cifnif') }}</label>
+                            <input type="text" name="cifnif" value="{{ cliente.cifnif }}" class="form-control"
+                                maxlength="30" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('tipoidfiscal') }}</label>
+                            <input type="text" name="tipoidfiscal" value="{{ cliente.tipoidfiscal }}" class="form-control"
+                                maxlength="25" />
+                        </div>
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('persona-fisica') }}</label>
+                            <select name="personafisica" class="form-control">
+                                <option value="1"{% if cliente.personafisica %} selected{% endif %}>{{ trans('persona-fisica') }}</option>
+                                <option value="0"{% if not cliente.personafisica %} selected{% endif %}>{{ trans('persona-juridica') }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('telefono1') }}</label>
+                            <input type="text" name="telefono1" value="{{ cliente.telefono1 }}" class="form-control"
+                                maxlength="30" />
+                        </div>
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('telefono2') }}</label>
+                            <input type="text" name="telefono2" value="{{ cliente.telefono2 }}" class="form-control"
+                                maxlength="30" />
+                        </div>
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('fax') }}</label>
+                            <input type="text" name="fax" value="{{ cliente.fax }}" class="form-control" maxlength="30" />
+                        </div>
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('email') }}</label>
+                            <input type="email" name="email" value="{{ cliente.email }}" class="form-control"
+                                maxlength="100" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            <label>{{ trans('web') }}</label>
+                            <input type="url" name="web" value="{{ cliente.web }}" class="form-control" maxlength="250" />
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            <label>{{ trans('grupo-cliente') }}</label>
+                            <select name="codgrupo" class="form-control">
+                                <option value="">{{ trans('sin-grupo') }}</option>
+                                {% for g in fsc.grupos %}
+                                <option value="{{ g.codgrupo }}"{% if cliente.codgrupo == g.codgrupo %} selected{% endif %}>
+                                    {{ g.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('regimen-iva') }}</label>
+                            <select name="regimeniva" class="form-control">
+                                {% for regimen in fsc.regimenes_iva %}
+                                <option value="{{ regimen }}"{% if cliente.regimeniva == regimen %} selected{% endif %}>
+                                    {{ regimen }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('recargo-equivalencia') }}</label>
+                            <select name="recargo" class="form-control">
+                                <option value="0"{% if not cliente.recargo %} selected{% endif %}>No</option>
+                                <option value="1"{% if cliente.recargo %} selected{% endif %}>Sí</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('dias-pago') }}</label>
+                            <input type="text" name="diaspago" value="{{ cliente.diaspago }}" class="form-control"
+                                maxlength="10" placeholder="1,15,31" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('fecha-alta') }}</label>
+                            <input type="text" value="{{ cliente.fechaalta }}" class="form-control" readonly />
+                        </div>
+                    </div>
+                    <div class="col-sm-2">
+                        <div class="form-group">
+                            <label>{{ trans('cliente-de-baja') }}</label>
+                            <select name="debaja" class="form-control">
+                                <option value="0"{% if not cliente.debaja %} selected{% endif %}>No</option>
+                                <option value="1"{% if cliente.debaja %} selected{% endif %}>Sí</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-sm-8">
+                        <div class="form-group">
+                            <label>{{ trans('observaciones') }}</label>
+                            <textarea name="observaciones" class="form-control" rows="2">{{ cliente.observaciones }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row" style="margin-top: 10px;">
+                    <div class="col-xs-4">
+                        {% if fsc.allow_delete %}
+                        <button type="button" id="btn_delete_cliente" class="btn btn-sm btn-danger">
+                            <i class="fa fa-trash fa-fw" aria-hidden="true"></i>
+                            <span class="hidden-xs hidden-sm">{{ trans('eliminar') }}</span>
+                        </button>
+                        {% endif %}
+                    </div>
+                    <div class="col-xs-8 text-right">
+                        <a class="btn btn-sm btn-default" href="{{ cliente.url() }}">
+                            <i class="fa fa-refresh fa-fw" aria-hidden="true"></i>
+                            <span class="hidden-xs hidden-sm">{{ trans('deshacer') }}</span>
+                        </a>
+                        <button class="btn btn-sm btn-primary" type="submit">
+                            <i class="fa fa-floppy-o fa-fw" aria-hidden="true"></i>
+                            <span class="hidden-xs">{{ trans('guardar') }}</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# Direcciones del cliente #}
+<div class="container-fluid">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="panel-title">
+                <i class="fa fa-map-marker"></i> {{ trans('direcciones') }}
+                <button type="button" class="btn btn-xs btn-success pull-right" data-toggle="modal" data-target="#modal_nueva_dir">
+                    <i class="fa fa-plus"></i> {{ trans('nueva-direccion') }}
+                </button>
+            </h3>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover table-condensed">
+                <thead>
+                    <tr>
+                        <th>{{ trans('descripcion-direccion') }}</th>
+                        <th>{{ trans('direccion') }}</th>
+                        <th class="hidden-xs">{{ trans('ciudad') }}</th>
+                        <th class="hidden-xs">{{ trans('provincia') }}</th>
+                        <th class="hidden-xs">{{ trans('codigo-postal') }}</th>
+                        <th class="hidden-xs">{{ trans('pais') }}</th>
+                        <th class="text-center">{{ trans('direccion-envio') }}</th>
+                        <th class="text-center">{{ trans('direccion-facturacion') }}</th>
+                        {% if fsc.allow_delete %}
+                        <th class="text-right"></th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dir in fsc.direcciones %}
+                    <tr>
+                        <td>{{ dir.descripcion ?: '-' }}</td>
+                        <td>{{ dir.direccion }}</td>
+                        <td class="hidden-xs">{{ dir.ciudad ?: '-' }}</td>
+                        <td class="hidden-xs">{{ dir.provincia ?: '-' }}</td>
+                        <td class="hidden-xs">{{ dir.codpostal ?: '-' }}</td>
+                        <td class="hidden-xs">{{ dir.codpais ?: '-' }}</td>
+                        <td class="text-center">
+                            {% if dir.domenvio %}<i class="fa fa-check text-success"></i>{% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if dir.domfacturacion %}<i class="fa fa-check text-success"></i>{% endif %}
+                        </td>
+                        {% if fsc.allow_delete %}
+                        <td class="text-right">
+                            <a href="{{ cliente.url() }}&action=delete_dir&dir_id={{ dir.id }}" class="btn btn-xs btn-danger"
+                                onclick="return confirm('{{ trans('confirmar-eliminar') }}');">
+                                <i class="fa fa-trash"></i>
+                            </a>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted">{{ trans('sin-resultados') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{# Modal: Nueva dirección #}
+<div class="modal fade" id="modal_nueva_dir" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form action="{{ cliente.url() }}" method="post">
+                {{ csrf_field() }}
+                <input type="hidden" name="action" value="save_dir" />
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                    <h4 class="modal-title">{{ trans('nueva-direccion') }}</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <label>{{ trans('descripcion-direccion') }}</label>
+                                <input type="text" name="descripcion" value="Principal" class="form-control"
+                                    maxlength="100" />
+                            </div>
+                        </div>
+                        <div class="col-sm-8">
+                            <div class="form-group">
+                                <label>{{ trans('direccion') }} *</label>
+                                <input type="text" name="direccion" class="form-control" maxlength="100" required />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <label>{{ trans('ciudad') }}</label>
+                                <input type="text" name="ciudad" class="form-control" maxlength="100" />
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <label>{{ trans('provincia') }}</label>
+                                <input type="text" name="provincia" class="form-control" maxlength="100" />
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <label>{{ trans('codigo-postal') }}</label>
+                                <input type="text" name="codpostal" class="form-control" maxlength="10" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <label>{{ trans('pais') }}</label>
+                                <input type="text" name="codpais" class="form-control" maxlength="20" />
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" name="domenvio" value="1" checked />
+                                    {{ trans('direccion-envio') }}
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" name="domfacturacion" value="1" checked />
+                                    {{ trans('direccion-facturacion') }}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ trans('cancelar') }}</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa fa-floppy-o"></i> {{ trans('guardar') }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        $("#btn_delete_cliente").click(function (event) {
+            event.preventDefault();
+            bootbox.confirm({
+                message: '{{ trans("confirmar-eliminar") }}',
+                title: '<b>{{ trans("eliminar-cliente") }}</b>',
+                callback: function (result) {
+                    if (result) {
+                        window.location.href = '{{ cliente.url()|raw }}&action=delete';
+                    }
+                }
+            });
+        });
+    });
+</script>
+
+{% endif %}
+
+{{ include('footer.html.twig') }}

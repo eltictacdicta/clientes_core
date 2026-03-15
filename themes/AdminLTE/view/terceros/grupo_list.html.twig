@@ -1,0 +1,95 @@
+{#
+/**
+ * Vista de listado y gestión de grupos de clientes.
+ * Plugin: clientes_core
+ * Twig nativo (no depende de legacy_support).
+ */
+#}
+
+{{ include('header.html.twig') }}
+
+<div class="container-fluid" style="margin-bottom: 10px;">
+    <div class="row">
+        <div class="col-sm-4">
+            <span class="btn-group">
+                <a class="btn btn-sm btn-default" href="{{ fsc.url() }}" title="{{ trans('recargar') }}">
+                    <i class="fa fa-refresh" aria-hidden="true"></i>
+                </a>
+            </span>
+        </div>
+        <div class="col-sm-8 text-right">
+            <span class="h2">{{ trans('grupos-clientes') }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="row">
+        {# Listado de grupos #}
+        <div class="col-sm-8">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h3 class="panel-title">{{ trans('grupos-clientes') }}</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>{{ trans('codigo-grupo') }}</th>
+                                <th>{{ trans('nombre-grupo') }}</th>
+                                <th>{{ trans('tarifa-grupo') }}</th>
+                                <th class="text-right"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for grupo in fsc.grupos is defined ? fsc.grupos : [] %}
+                            <tr>
+                                <td>
+                                    <a href="{{ grupo.url() }}">{{ grupo.codgrupo }}</a>
+                                </td>
+                                <td>{{ grupo.nombre }}</td>
+                                <td>{{ grupo.codtarifa ?: '-' }}</td>
+                                <td class="text-right">
+                                    <a href="{{ grupo.url() }}" class="btn btn-xs btn-default">
+                                        <i class="fa fa-pencil"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">{{ trans('sin-resultados') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {# Formulario para nuevo grupo #}
+        <div class="col-sm-4">
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <h3 class="panel-title">
+                        <i class="fa fa-plus"></i> {{ trans('nuevo-grupo') }}
+                    </h3>
+                </div>
+                <div class="panel-body">
+                    <form action="{{ fsc.url() }}" method="post">
+                        {{ csrf_field() }}
+                        <input type="hidden" name="action" value="save_grupo" />
+                        <div class="form-group">
+                            <label>{{ trans('nombre-grupo') }} *</label>
+                            <input type="text" name="nombre" class="form-control" maxlength="100" required />
+                        </div>
+                        <button class="btn btn-sm btn-success btn-block" type="submit">
+                            <i class="fa fa-floppy-o"></i> {{ trans('guardar') }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ include('footer.html.twig') }}

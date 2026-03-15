@@ -1,0 +1,323 @@
+{#
+/**
+ * Listado de clientes y grupos.
+ * Plugin: clientes_core
+ * Twig nativo (no depende de legacy_support).
+ */
+#}
+
+{{ include('header.html.twig') }}
+
+<div class="container-fluid" style="margin-bottom: 10px;">
+    <div class="row">
+        <div class="col-sm-4">
+            <span class="btn-group">
+                <a class="btn btn-sm btn-default" href="{{ fsc.url() }}" title="Recargar">
+                    <i class="fa fa-refresh" aria-hidden="true"></i>
+                </a>
+            </span>
+            <button type="button" class="btn btn-sm btn-success" data-toggle="modal" data-target="#modal_nuevo_cliente">
+                <i class="fa fa-plus fa-fw" aria-hidden="true"></i>
+                <span class="hidden-xs">{{ trans('nuevo-cliente') }}</span>
+            </button>
+        </div>
+        <div class="col-sm-8 text-right">
+            <span class="h2">{{ trans('clientes') }}</span>
+        </div>
+    </div>
+</div>
+
+{# Barra de búsqueda y filtros #}
+<div class="container-fluid" style="margin-bottom: 10px;">
+    <div class="row">
+        <div class="col-sm-3">
+            <form action="{{ fsc.url() }}" method="post" class="form">
+                {{ csrf_field() }}
+                <div class="input-group">
+                    <input type="text" name="query" value="{{ fsc.query }}" class="form-control"
+                        placeholder="{{ trans('buscar-cliente') }}" autocomplete="off" autofocus />
+                    <span class="input-group-btn">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="fa fa-search" aria-hidden="true"></i>
+                        </button>
+                    </span>
+                </div>
+            </form>
+        </div>
+        <div class="col-sm-2">
+            <select class="form-control" onchange="window.location.href='{{ fsc.url() }}&grupo='+this.value;">
+                <option value="">-- {{ trans('grupo-cliente') }} --</option>
+                {% for g in fsc.grupos %}
+                <option value="{{ g.codgrupo }}"{% if fsc.grupo == g.codgrupo %} selected{% endif %}>{{ g.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-sm-2">
+            <select class="form-control" onchange="window.location.href='{{ fsc.url() }}&orden='+this.value;">
+                <option value="nombre">{{ trans('nombre-cliente') }}</option>
+                <option value="codcliente"{% if 'codcliente' in fsc.orden %} selected{% endif %}>{{ trans('codigo-cliente') }}</option>
+                <option value="fechaalta"{% if 'fechaalta' in fsc.orden %} selected{% endif %}>{{ trans('fecha-alta') }}</option>
+                <option value="cifnif"{% if 'cifnif ASC' == fsc.orden %} selected{% endif %}>{{ trans('cifnif') }}</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+{# Pestañas: Clientes / Grupos #}
+<ul class="nav nav-tabs" style="margin-bottom: 0;">
+    <li role="presentation" class="{% if not fsc.grupo %}active{% endif %}">
+        <a href="{{ fsc.url() }}">
+            <i class="fa fa-users fa-fw" aria-hidden="true"></i>
+            {{ trans('clientes') }}
+            <span class="badge">{{ fsc.total }}</span>
+        </a>
+    </li>
+    <li role="presentation" id="tab_grupos">
+        <a href="#grupos" data-toggle="tab">
+            <i class="fa fa-object-group fa-fw" aria-hidden="true"></i>
+            {{ trans('grupos-clientes') }}
+            <span class="badge">{{ fsc.grupos|length }}</span>
+        </a>
+    </li>
+</ul>
+
+<div class="tab-content">
+    {# Tab: Listado de clientes #}
+    <div role="tabpanel" class="tab-pane active" id="clientes_tab">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>{{ trans('codigo-cliente') }}</th>
+                        <th>{{ trans('nombre-cliente') }}</th>
+                        <th class="hidden-xs">{{ trans('cifnif') }}</th>
+                        <th class="hidden-xs">{{ trans('telefono1') }}</th>
+                        <th class="hidden-xs">{{ trans('email') }}</th>
+                        <th class="hidden-xs">{{ trans('grupo-cliente') }}</th>
+                        <th class="text-center">{{ trans('cliente-activo') }}</th>
+                        {% if fsc.allow_delete %}
+                        <th class="text-right"></th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cli in fsc.clientes %}
+                    <tr>
+                        <td><a href="{{ cli.url() }}">{{ cli.codcliente }}</a></td>
+                        <td>
+                            <a href="{{ cli.url() }}">
+                                {{ cli.nombre }}
+                                {% if cli.nombre != cli.razonsocial and cli.razonsocial %}
+                                    <small class="text-muted">({{ cli.razonsocial }})</small>
+                                {% endif %}
+                            </a>
+                        </td>
+                        <td class="hidden-xs">{{ cli.cifnif ?: '-' }}</td>
+                        <td class="hidden-xs">{{ cli.telefono1 ?: '-' }}</td>
+                        <td class="hidden-xs">
+                            {% if cli.email %}
+                                <a href="mailto:{{ cli.email }}">{{ cli.email }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="hidden-xs">{{ cli.codgrupo ?: '-' }}</td>
+                        <td class="text-center">
+                            {% if cli.debaja %}
+                                <span class="label label-danger">{{ trans('cliente-de-baja') }}</span>
+                            {% else %}
+                                <span class="label label-success">{{ trans('cliente-activo') }}</span>
+                            {% endif %}
+                        </td>
+                        {% if fsc.allow_delete %}
+                        <td class="text-right">
+                            <a href="{{ fsc.url() }}&delete={{ cli.codcliente }}" class="btn btn-xs btn-danger"
+                                onclick="return confirm('{{ trans('confirmar-eliminar') }}');">
+                                <i class="fa fa-trash"></i>
+                            </a>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                    <tr class="warning">
+                        <td colspan="8" class="text-center">{{ trans('sin-resultados') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# Paginación #}
+        {% if fsc.paginas|length > 0 %}
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-sm-12 text-center">
+                    <ul class="pagination">
+                        {% for pag in fsc.paginas %}
+                        <li{% if pag.actual %} class="active"{% endif %}>
+                            <a href="{{ pag.url }}">{{ pag.num }}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {# Tab: Grupos de clientes #}
+    <div role="tabpanel" class="tab-pane" id="grupos">
+        <div class="container-fluid" style="margin-top: 15px;">
+            <div class="row">
+                <div class="col-sm-8">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>{{ trans('codigo-grupo') }}</th>
+                                    <th>{{ trans('nombre-grupo') }}</th>
+                                    <th>{{ trans('tarifa-grupo') }}</th>
+                                    <th class="text-right"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for g in fsc.grupos %}
+                                <tr>
+                                    <td><a href="{{ g.url() }}">{{ g.codgrupo }}</a></td>
+                                    <td><a href="{{ g.url() }}">{{ g.nombre }}</a></td>
+                                    <td>{{ g.codtarifa ?: '-' }}</td>
+                                    <td class="text-right">
+                                        <a href="{{ g.url() }}" class="btn btn-xs btn-default">
+                                            <i class="fa fa-pencil"></i>
+                                        </a>
+                                        {% if fsc.allow_delete %}
+                                        <a href="{{ fsc.url() }}&delete_grupo={{ g.codgrupo }}" class="btn btn-xs btn-danger"
+                                            onclick="return confirm('{{ trans('confirmar-eliminar') }}');">
+                                            <i class="fa fa-trash"></i>
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr class="warning">
+                                    <td colspan="4" class="text-center">{{ trans('sin-resultados') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="col-sm-4">
+                    <div class="panel panel-success">
+                        <div class="panel-heading">
+                            <h3 class="panel-title"><i class="fa fa-plus"></i> {{ trans('nuevo-grupo') }}</h3>
+                        </div>
+                        <div class="panel-body">
+                            <form action="{{ fsc.url() }}" method="post">
+                                {{ csrf_field() }}
+                                <div class="form-group">
+                                    <input type="text" name="nuevo_grupo" class="form-control"
+                                        placeholder="{{ trans('nombre-grupo') }}" required />
+                                </div>
+                                <button class="btn btn-sm btn-success btn-block" type="submit">
+                                    <i class="fa fa-floppy-o"></i> {{ trans('guardar') }}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Modal: Nuevo cliente #}
+<div class="modal fade" id="modal_nuevo_cliente" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form action="{{ fsc.url() }}" method="post">
+                {{ csrf_field() }}
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                    <h4 class="modal-title">{{ trans('nuevo-cliente') }}</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <label>{{ trans('codigo-cliente') }}</label>
+                                <input type="text" name="codcliente" class="form-control" maxlength="6"
+                                    placeholder="Auto" />
+                            </div>
+                        </div>
+                        <div class="col-sm-8">
+                            <div class="form-group">
+                                <label>{{ trans('nombre-cliente') }} *</label>
+                                <input type="text" name="nombre" class="form-control" maxlength="100" required autofocus />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label>{{ trans('razonsocial') }}</label>
+                                <input type="text" name="razonsocial" class="form-control" maxlength="100" />
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="form-group">
+                                <label>{{ trans('cifnif') }}</label>
+                                <input type="text" name="cifnif" class="form-control" maxlength="30" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <label>{{ trans('telefono1') }}</label>
+                                <input type="text" name="telefono1" class="form-control" maxlength="30" />
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <label>{{ trans('email') }}</label>
+                                <input type="email" name="email" class="form-control" maxlength="100" />
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <label>{{ trans('grupo-cliente') }}</label>
+                                <select name="codgrupo" class="form-control">
+                                    <option value="">{{ trans('sin-grupo') }}</option>
+                                    {% for g in fsc.grupos %}
+                                    <option value="{{ g.codgrupo }}">{{ g.nombre }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ trans('cancelar') }}</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa fa-floppy-o"></i> {{ trans('guardar') }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        {% if fsc.url() ends with '#grupos' %}
+        $('#tab_grupos a').tab('show');
+        {% endif %}
+
+        if (window.location.hash === '#grupos') {
+            $('#tab_grupos a').tab('show');
+        }
+    });
+</script>
+
+{{ include('footer.html.twig') }}
