@@ -30,6 +30,14 @@ namespace FSFramework\model;
  */
 class cliente extends \fs_model
 {
+    private const COMMERCIAL_FIELDS = [
+        'codserie',
+        'coddivisa',
+        'codpago',
+        'codagente',
+        'codproveedor',
+        'codtarifa',
+    ];
 
     /**
      * Clave primaria. Varchar (6).
@@ -225,6 +233,8 @@ class cliente extends \fs_model
             $this->codproveedor = NULL;
             $this->codtarifa = NULL;
         }
+
+        $this->load_commercial_extension();
     }
 
     protected function install()
@@ -438,6 +448,7 @@ class cliente extends \fs_model
     {
         if ($this->test()) {
             $this->clean_cache();
+            $use_extension = $this->has_commercial_extension();
 
             if ($this->exists()) {
                 $sql = "UPDATE " . $this->table_name . " SET nombre = " . $this->var2str($this->nombre)
@@ -449,10 +460,6 @@ class cliente extends \fs_model
                     . ", fax = " . $this->var2str($this->fax)
                     . ", email = " . $this->var2str($this->email)
                     . ", web = " . $this->var2str($this->web)
-                    . ", codserie = " . $this->var2str($this->codserie)
-                    . ", coddivisa = " . $this->var2str($this->coddivisa)
-                    . ", codpago = " . $this->var2str($this->codpago)
-                    . ", codagente = " . $this->var2str($this->codagente)
                     . ", codgrupo = " . $this->var2str($this->codgrupo)
                     . ", debaja = " . $this->var2str($this->debaja)
                     . ", fechabaja = " . $this->var2str($this->fechabaja)
@@ -461,16 +468,21 @@ class cliente extends \fs_model
                     . ", regimeniva = " . $this->var2str($this->regimeniva)
                     . ", recargo = " . $this->var2str($this->recargo)
                     . ", personafisica = " . $this->var2str($this->personafisica)
-                    . ", diaspago = " . $this->var2str($this->diaspago)
-                    . ", codproveedor = " . $this->var2str($this->codproveedor)
-                    . ", codtarifa = " . $this->var2str($this->codtarifa)
-                    . "  WHERE codcliente = " . $this->var2str($this->codcliente) . ";";
+                    . ", diaspago = " . $this->var2str($this->diaspago);
+
+                if (!$use_extension) {
+                    $sql .= ", codserie = " . $this->var2str($this->codserie)
+                        . ", coddivisa = " . $this->var2str($this->coddivisa)
+                        . ", codpago = " . $this->var2str($this->codpago)
+                        . ", codagente = " . $this->var2str($this->codagente)
+                        . ", codproveedor = " . $this->var2str($this->codproveedor)
+                        . ", codtarifa = " . $this->var2str($this->codtarifa);
+                }
+
+                $sql .= "  WHERE codcliente = " . $this->var2str($this->codcliente) . ";";
             } else {
-                $sql = "INSERT INTO " . $this->table_name . " (codcliente,nombre,razonsocial,tipoidfiscal,
-               cifnif,telefono1,telefono2,fax,email,web,codserie,coddivisa,codpago,codagente,codgrupo,
-               debaja,fechabaja,fechaalta,observaciones,regimeniva,recargo,personafisica,diaspago,
-               codproveedor,codtarifa) VALUES
-                      (" . $this->var2str($this->codcliente)
+                $columns = "codcliente,nombre,razonsocial,tipoidfiscal,cifnif,telefono1,telefono2,fax,email,web,codgrupo,debaja,fechabaja,fechaalta,observaciones,regimeniva,recargo,personafisica,diaspago";
+                $values = $this->var2str($this->codcliente)
                     . "," . $this->var2str($this->nombre)
                     . "," . $this->var2str($this->razonsocial)
                     . "," . $this->var2str($this->tipoidfiscal)
@@ -480,10 +492,6 @@ class cliente extends \fs_model
                     . "," . $this->var2str($this->fax)
                     . "," . $this->var2str($this->email)
                     . "," . $this->var2str($this->web)
-                    . "," . $this->var2str($this->codserie)
-                    . "," . $this->var2str($this->coddivisa)
-                    . "," . $this->var2str($this->codpago)
-                    . "," . $this->var2str($this->codagente)
                     . "," . $this->var2str($this->codgrupo)
                     . "," . $this->var2str($this->debaja)
                     . "," . $this->var2str($this->fechabaja)
@@ -492,12 +500,26 @@ class cliente extends \fs_model
                     . "," . $this->var2str($this->regimeniva)
                     . "," . $this->var2str($this->recargo)
                     . "," . $this->var2str($this->personafisica)
-                    . "," . $this->var2str($this->diaspago)
-                    . "," . $this->var2str($this->codproveedor)
-                    . "," . $this->var2str($this->codtarifa) . ");";
+                    . "," . $this->var2str($this->diaspago);
+
+                if (!$use_extension) {
+                    $columns .= ",codserie,coddivisa,codpago,codagente,codproveedor,codtarifa";
+                    $values .= "," . $this->var2str($this->codserie)
+                        . "," . $this->var2str($this->coddivisa)
+                        . "," . $this->var2str($this->codpago)
+                        . "," . $this->var2str($this->codagente)
+                        . "," . $this->var2str($this->codproveedor)
+                        . "," . $this->var2str($this->codtarifa);
+                }
+
+                $sql = "INSERT INTO " . $this->table_name . " (" . $columns . ") VALUES (" . $values . ");";
             }
 
-            return $this->db->exec($sql);
+            if (!$this->db->exec($sql)) {
+                return FALSE;
+            }
+
+            return $use_extension ? $this->save_commercial_extension() : TRUE;
         }
 
         return FALSE;
@@ -506,7 +528,59 @@ class cliente extends \fs_model
     public function delete()
     {
         $this->clean_cache();
-        return $this->db->exec("DELETE FROM " . $this->table_name . " WHERE codcliente = " . $this->var2str($this->codcliente) . ";");
+        $result = $this->db->exec("DELETE FROM " . $this->table_name . " WHERE codcliente = " . $this->var2str($this->codcliente) . ";");
+        if ($result && $this->has_commercial_extension()) {
+            $this->delete_commercial_extension();
+        }
+
+        return $result;
+    }
+
+    private function has_commercial_extension()
+    {
+        return class_exists('cliente_facturacion');
+    }
+
+    private function load_commercial_extension()
+    {
+        if (empty($this->codcliente) || !$this->has_commercial_extension()) {
+            return;
+        }
+
+        $extensionModel = new \cliente_facturacion();
+        $extension = $extensionModel->get($this->codcliente);
+        if (!$extension) {
+            return;
+        }
+
+        foreach (self::COMMERCIAL_FIELDS as $field) {
+            $this->{$field} = $extension->{$field};
+        }
+    }
+
+    private function save_commercial_extension()
+    {
+        $extensionModel = new \cliente_facturacion();
+        $extension = $extensionModel->get($this->codcliente);
+        if (!$extension) {
+            $extension = new \cliente_facturacion();
+            $extension->codcliente = $this->codcliente;
+        }
+
+        foreach (self::COMMERCIAL_FIELDS as $field) {
+            $extension->{$field} = $this->{$field};
+        }
+
+        return $extension->save();
+    }
+
+    private function delete_commercial_extension()
+    {
+        $extensionModel = new \cliente_facturacion();
+        $extension = $extensionModel->get($this->codcliente);
+        if ($extension) {
+            $extension->delete();
+        }
     }
 
     private function clean_cache()

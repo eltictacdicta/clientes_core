@@ -19,6 +19,8 @@
 
 namespace FSFramework\Plugins\clientes_core;
 
+require_once __DIR__ . '/src/ViewHookRegistry.php';
+
 use FSFramework\Event\FSEventDispatcher;
 use FSFramework\Event\TwigInitEvent;
 
@@ -81,6 +83,17 @@ class Init
 
                 return implode(', ', $parts);
             }));
+        } catch (\LogicException $e) {
+        }
+
+        try {
+            $twig->addFunction(new \Twig\TwigFunction('clientes_render_hook', function ($hook, $context = []) use ($twig) {
+                if (!is_string($hook)) {
+                    return '';
+                }
+
+                return ViewHookRegistry::render($twig, $hook, is_array($context) ? $context : []);
+            }, ['is_safe' => ['html']]));
         } catch (\LogicException $e) {
         }
     }

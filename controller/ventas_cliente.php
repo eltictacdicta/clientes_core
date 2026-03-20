@@ -17,13 +17,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-require_once 'plugins/catalogo_core/extras/fbase_controller.php';
+require_once 'plugins/clientes_core/extras/clientes_controller.php';
 
 /**
  * Controlador del detalle de un cliente.
  * Plugin: clientes_core
  */
-class ventas_cliente extends fbase_controller
+class ventas_cliente extends clientes_controller
 {
 
     public $allow_delete;
@@ -105,6 +105,7 @@ class ventas_cliente extends fbase_controller
         $this->cliente->fax = $_POST['fax'] ?? $this->cliente->fax;
         $this->cliente->email = $_POST['email'] ?? $this->cliente->email;
         $this->cliente->web = $_POST['web'] ?? $this->cliente->web;
+        $this->cliente->coddivisa = !empty($_POST['coddivisa']) ? $_POST['coddivisa'] : null;
         $this->cliente->codgrupo = !empty($_POST['codgrupo']) ? $_POST['codgrupo'] : null;
         $this->cliente->regimeniva = $_POST['regimeniva'] ?? $this->cliente->regimeniva;
         $this->cliente->recargo = isset($_POST['recargo']) && $_POST['recargo'] == '1';

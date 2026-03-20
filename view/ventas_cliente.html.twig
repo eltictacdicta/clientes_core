@@ -201,6 +201,8 @@
                     </div>
                 </div>
 
+                {{ clientes_render_hook('cliente_form_after_main', {'fsc': fsc, 'cliente': cliente}) }}
+
                 <div class="row" style="margin-top: 10px;">
                     <div class="col-xs-4">
                         {% if fsc.allow_delete %}
@@ -360,6 +362,8 @@
                             </div>
                         </div>
                     </div>
+
+                    {{ clientes_render_hook('cliente_direccion_form_after_codpais', {'fsc': fsc, 'cliente': cliente}) }}
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">{{ trans('cancelar') }}</button>

@@ -17,13 +17,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-require_once 'plugins/catalogo_core/extras/fbase_controller.php';
+require_once 'plugins/clientes_core/extras/clientes_controller.php';
 
 /**
  * Controlador del detalle de un grupo de clientes.
  * Plugin: clientes_core
  */
-class ventas_grupo extends fbase_controller
+class ventas_grupo extends clientes_controller
 {
 
     public $allow_delete;
