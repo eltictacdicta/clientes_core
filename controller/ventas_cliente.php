@@ -83,6 +83,9 @@ class ventas_cliente extends clientes_controller
 
                     case 'new_dir':
                         break;
+
+                    default:
+                        break;
                 }
 
                 $this->direcciones = $this->cliente->get_direcciones();

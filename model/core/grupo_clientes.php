@@ -25,6 +25,8 @@ namespace FSFramework\model;
  */
 class grupo_clientes extends \fs_model
 {
+    private const SQL_SELECT_ALL = 'SELECT * FROM ';
+    private const PK_WHERE = ' WHERE codgrupo = ';
 
     /**
      * Clave primaria
@@ -107,7 +109,7 @@ class grupo_clientes extends \fs_model
      */
     public function get($cod)
     {
-        $data = $this->db->select("SELECT * FROM " . $this->table_name . " WHERE codgrupo = " . $this->var2str($cod) . ";");
+        $data = $this->db->select(self::SQL_SELECT_ALL . $this->table_name . self::PK_WHERE . $this->var2str($cod) . ";");
         if ($data) {
             return new \grupo_clientes($data[0]);
         }
@@ -121,7 +123,7 @@ class grupo_clientes extends \fs_model
             return FALSE;
         }
 
-        return $this->db->select("SELECT * FROM " . $this->table_name . " WHERE codgrupo = " . $this->var2str($this->codgrupo) . ";");
+        return $this->db->select(self::SQL_SELECT_ALL . $this->table_name . self::PK_WHERE . $this->var2str($this->codgrupo) . ";");
     }
 
     public function test(): bool
@@ -145,7 +147,7 @@ class grupo_clientes extends \fs_model
         if ($this->exists()) {
             $sql = "UPDATE " . $this->table_name . " SET nombre = " . $this->var2str($this->nombre)
                 . ", codtarifa = " . $this->var2str($this->codtarifa)
-                . "  WHERE codgrupo = " . $this->var2str($this->codgrupo) . ";";
+                . self::PK_WHERE . $this->var2str($this->codgrupo) . ";";
         } else {
             $sql = "INSERT INTO " . $this->table_name . " (codgrupo,nombre,codtarifa) VALUES "
                 . "(" . $this->var2str($this->codgrupo)
@@ -158,12 +160,12 @@ class grupo_clientes extends \fs_model
 
     public function delete()
     {
-        return $this->db->exec("DELETE FROM " . $this->table_name . " WHERE codgrupo = " . $this->var2str($this->codgrupo) . ";");
+        return $this->db->exec("DELETE FROM " . $this->table_name . self::PK_WHERE . $this->var2str($this->codgrupo) . ";");
     }
 
     public function all()
     {
-        $data = $this->db->select("SELECT * FROM " . $this->table_name . " ORDER BY nombre ASC;");
+        $data = $this->db->select(self::SQL_SELECT_ALL . $this->table_name . " ORDER BY nombre ASC;");
         return $this->all_from_data($data);
     }
 
@@ -173,7 +175,7 @@ class grupo_clientes extends \fs_model
      */
     public function all_with_tarifa($cod)
     {
-        $data = $this->db->select("SELECT * FROM " . $this->table_name . " WHERE codtarifa = " . $this->var2str($cod) . " ORDER BY codgrupo ASC;");
+        $data = $this->db->select(self::SQL_SELECT_ALL . $this->table_name . " WHERE codtarifa = " . $this->var2str($cod) . " ORDER BY codgrupo ASC;");
         return $this->all_from_data($data);
     }
 

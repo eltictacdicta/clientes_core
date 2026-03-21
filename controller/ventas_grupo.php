@@ -69,6 +69,9 @@ class ventas_grupo extends clientes_controller
                     case 'delete':
                         $this->delete_grupo();
                         return;
+
+                    default:
+                        break;
                 }
 
                 $this->load_clientes();

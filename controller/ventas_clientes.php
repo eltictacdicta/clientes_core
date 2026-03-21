@@ -90,39 +90,60 @@ class ventas_clientes extends clientes_controller
     {
         $cliente = new cliente();
 
-        if (isset($_REQUEST['query']) && $_REQUEST['query'] !== '') {
-            $this->query = $_REQUEST['query'];
-            $this->clientes = $cliente->search($this->query, $this->offset);
-            $this->total = count($this->clientes);
-        } else if (isset($_GET['grupo']) && $_GET['grupo'] !== '') {
-            $this->grupo = $_GET['grupo'];
-            $sql = "SELECT * FROM clientes WHERE codgrupo = " . $cliente->var2str($this->grupo)
-                . " ORDER BY " . $this->orden;
-            $data = $this->db->select_limit($sql, FS_ITEM_LIMIT, $this->offset);
-            $this->clientes = [];
-            if ($data) {
-                foreach ($data as $d) {
-                    $this->clientes[] = new cliente($d);
-                }
-            }
+        $query = fs_filter_input_req('query', '');
+        $grupo = fs_filter_input_req('grupo', '');
 
-            $data2 = $this->db->select("SELECT COUNT(*) as total FROM clientes WHERE codgrupo = " . $cliente->var2str($this->grupo) . ";");
-            $this->total = $data2 ? intval($data2[0]['total']) : 0;
+        if ($query !== '') {
+            $this->searchClientes($cliente);
+        } elseif ($grupo !== '') {
+            $this->filterByGroup($cliente);
         } else {
-            $sql = "SELECT * FROM clientes ORDER BY " . $this->orden;
-            $data = $this->db->select_limit($sql, FS_ITEM_LIMIT, $this->offset);
-            $this->clientes = [];
-            if ($data) {
-                foreach ($data as $d) {
-                    $this->clientes[] = new cliente($d);
-                }
-            }
-
-            $data2 = $this->db->select("SELECT COUNT(*) as total FROM clientes;");
-            $this->total = $data2 ? intval($data2[0]['total']) : 0;
+            $this->loadAllClientes();
         }
 
         $this->paginas = $this->fbase_paginas($this->url(), $this->total, $this->offset);
+    }
+
+    private function searchClientes(cliente $cliente): void
+    {
+        $this->query = fs_filter_input_req('query', '');
+        $this->clientes = $cliente->search($this->query, $this->offset);
+        $this->total = count($this->clientes);
+    }
+
+    private function filterByGroup(cliente $cliente): void
+    {
+        $this->grupo = fs_filter_input_req('grupo', '');
+        $sql = "SELECT * FROM clientes WHERE codgrupo = " . $cliente->var2str($this->grupo)
+            . " ORDER BY " . $this->orden;
+        $data = $this->db->select_limit($sql, FS_ITEM_LIMIT, $this->offset);
+        $this->clientes = $this->hydrateClientes($data);
+
+        $data2 = $this->db->select("SELECT COUNT(*) as total FROM clientes WHERE codgrupo = " . $cliente->var2str($this->grupo) . ";");
+        $this->total = $data2 ? intval($data2[0]['total']) : 0;
+    }
+
+    private function loadAllClientes(): void
+    {
+        $sql = "SELECT * FROM clientes ORDER BY " . $this->orden;
+        $data = $this->db->select_limit($sql, FS_ITEM_LIMIT, $this->offset);
+        $this->clientes = $this->hydrateClientes($data);
+
+        $data2 = $this->db->select("SELECT COUNT(*) as total FROM clientes;");
+        $this->total = $data2 ? intval($data2[0]['total']) : 0;
+    }
+
+    private function hydrateClientes(?array $data): array
+    {
+        if (!$data) {
+            return [];
+        }
+
+        $clientes = [];
+        foreach ($data as $d) {
+            $clientes[] = new cliente($d);
+        }
+        return $clientes;
     }
 
     private function buscar_cliente_json()

@@ -41,6 +41,14 @@ class Init
 
     private function registerTwigExtensions(\Twig\Environment $twig): void
     {
+        $this->registerClienteResumen($twig);
+        $this->registerClienteEstado($twig);
+        $this->registerDireccionCompleta($twig);
+        $this->registerClientesRenderHook($twig);
+    }
+
+    private function registerClienteResumen(\Twig\Environment $twig): void
+    {
         try {
             $twig->addFunction(new \Twig\TwigFunction('cliente_resumen', function ($cliente) {
                 if (!$cliente) {
@@ -54,9 +62,12 @@ class Init
 
                 return $nombre;
             }));
-        } catch (\LogicException $e) {
+        } catch (\LogicException) {
         }
+    }
 
+    private function registerClienteEstado(\Twig\Environment $twig): void
+    {
         try {
             $twig->addFunction(new \Twig\TwigFunction('cliente_estado', function ($cliente) {
                 if (!$cliente) {
@@ -65,9 +76,12 @@ class Init
 
                 return $cliente->debaja ? 'inactive' : 'active';
             }));
-        } catch (\LogicException $e) {
+        } catch (\LogicException) {
         }
+    }
 
+    private function registerDireccionCompleta(\Twig\Environment $twig): void
+    {
         try {
             $twig->addFunction(new \Twig\TwigFunction('direccion_completa', function ($direccion) {
                 if (!$direccion) {
@@ -83,9 +97,12 @@ class Init
 
                 return implode(', ', $parts);
             }));
-        } catch (\LogicException $e) {
+        } catch (\LogicException) {
         }
+    }
 
+    private function registerClientesRenderHook(\Twig\Environment $twig): void
+    {
         try {
             $twig->addFunction(new \Twig\TwigFunction('clientes_render_hook', function ($hook, $context = []) use ($twig) {
                 if (!is_string($hook)) {
@@ -94,7 +111,7 @@ class Init
 
                 return ViewHookRegistry::render($twig, $hook, is_array($context) ? $context : []);
             }, ['is_safe' => ['html']]));
-        } catch (\LogicException $e) {
+        } catch (\LogicException) {
         }
     }
 }

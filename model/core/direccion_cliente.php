@@ -25,6 +25,10 @@ namespace FSFramework\model;
  */
 class direccion_cliente extends \fs_model
 {
+    private const SQL_SELECT_ALL = 'SELECT * FROM ';
+    private const SQL_UPDATE = 'UPDATE ';
+    private const PK_WHERE_ID = ' WHERE id = ';
+    private const FK_WHERE_CLIENTE = ' WHERE codcliente = ';
 
     /**
      * Clave primaria.
@@ -106,7 +110,7 @@ class direccion_cliente extends \fs_model
      */
     public function get($id)
     {
-        $data = $this->db->select("SELECT * FROM " . $this->table_name . " WHERE id = " . $this->var2str($id) . ";");
+        $data = $this->db->select(self::SQL_SELECT_ALL . $this->table_name . self::PK_WHERE_ID . $this->var2str($id) . ";");
         if ($data) {
             return new \direccion_cliente($data[0]);
         }
@@ -120,7 +124,7 @@ class direccion_cliente extends \fs_model
             return FALSE;
         }
 
-        return $this->db->select("SELECT * FROM " . $this->table_name . " WHERE id = " . $this->var2str($this->id) . ";");
+        return $this->db->select(self::SQL_SELECT_ALL . $this->table_name . self::PK_WHERE_ID . $this->var2str($this->id) . ";");
     }
 
     public function test(): bool
@@ -150,16 +154,16 @@ class direccion_cliente extends \fs_model
 
         $sql = "";
         if ($this->domenvio) {
-            $sql .= "UPDATE " . $this->table_name . " SET domenvio = false"
-                . " WHERE codcliente = " . $this->var2str($this->codcliente) . ";";
+            $sql .= self::SQL_UPDATE . $this->table_name . " SET domenvio = false"
+                . self::FK_WHERE_CLIENTE . $this->var2str($this->codcliente) . ";";
         }
         if ($this->domfacturacion) {
-            $sql .= "UPDATE " . $this->table_name . " SET domfacturacion = false"
-                . " WHERE codcliente = " . $this->var2str($this->codcliente) . ";";
+            $sql .= self::SQL_UPDATE . $this->table_name . " SET domfacturacion = false"
+                . self::FK_WHERE_CLIENTE . $this->var2str($this->codcliente) . ";";
         }
 
         if ($this->exists()) {
-            $sql .= "UPDATE " . $this->table_name . " SET codcliente = " . $this->var2str($this->codcliente)
+            $sql .= self::SQL_UPDATE . $this->table_name . " SET codcliente = " . $this->var2str($this->codcliente)
                 . ", codpais = " . $this->var2str($this->codpais)
                 . ", apartado = " . $this->var2str($this->apartado)
                 . ", provincia = " . $this->var2str($this->provincia)
@@ -170,7 +174,7 @@ class direccion_cliente extends \fs_model
                 . ", domfacturacion = " . $this->var2str($this->domfacturacion)
                 . ", descripcion = " . $this->var2str($this->descripcion)
                 . ", fecha = " . $this->var2str($this->fecha)
-                . "  WHERE id = " . $this->var2str($this->id) . ";";
+                . self::PK_WHERE_ID . $this->var2str($this->id) . ";";
 
             return $this->db->exec($sql);
         }
@@ -198,14 +202,14 @@ class direccion_cliente extends \fs_model
 
     public function delete()
     {
-        return $this->db->exec("DELETE FROM " . $this->table_name . " WHERE id = " . $this->var2str($this->id) . ";");
+        return $this->db->exec("DELETE FROM " . $this->table_name . self::PK_WHERE_ID . $this->var2str($this->id) . ";");
     }
 
     public function all($offset = 0)
     {
         $dirlist = array();
 
-        $data = $this->db->select_limit("SELECT * FROM " . $this->table_name . " ORDER BY id ASC", FS_ITEM_LIMIT, $offset);
+        $data = $this->db->select_limit(self::SQL_SELECT_ALL . $this->table_name . " ORDER BY id ASC", FS_ITEM_LIMIT, $offset);
         if ($data) {
             foreach ($data as $d) {
                 $dirlist[] = new \direccion_cliente($d);
@@ -222,7 +226,7 @@ class direccion_cliente extends \fs_model
     public function all_from_cliente($cod)
     {
         $dirlist = array();
-        $sql = "SELECT * FROM " . $this->table_name . " WHERE codcliente = " . $this->var2str($cod)
+        $sql = self::SQL_SELECT_ALL . $this->table_name . self::FK_WHERE_CLIENTE . $this->var2str($cod)
             . " ORDER BY id DESC;";
 
         $data = $this->db->select($sql);

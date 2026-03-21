@@ -39,6 +39,10 @@ class cliente extends \fs_model
         'codtarifa',
     ];
 
+    private const SQL_SELECT_ALL = 'SELECT * FROM ';
+    private const SQL_UPDATE = 'UPDATE ';
+    private const PK_WHERE = ' WHERE codcliente = ';
+
     /**
      * Clave primaria. Varchar (6).
      * @var string 
@@ -316,7 +320,7 @@ class cliente extends \fs_model
      */
     public function get($cod)
     {
-        $data = $this->db->select("SELECT * FROM " . $this->table_name . " WHERE codcliente = " . $this->var2str($cod) . ";");
+        $data = $this->db->select(self::SQL_SELECT_ALL . $this->table_name . self::PK_WHERE . $this->var2str($cod) . ";");
         if ($data) {
             return new \cliente($data[0]);
         }
@@ -333,10 +337,10 @@ class cliente extends \fs_model
     {
         if ($cifnif == '' && $razon) {
             $razon = $this->no_html(mb_strtolower($razon, 'UTF8'));
-            $sql = "SELECT * FROM " . $this->table_name . " WHERE cifnif = '' AND lower(razonsocial) = " . $this->var2str($razon) . ";";
+            $sql = self::SQL_SELECT_ALL . $this->table_name . " WHERE cifnif = '' AND lower(razonsocial) = " . $this->var2str($razon) . ";";
         } else {
             $cifnif = mb_strtolower($cifnif, 'UTF8');
-            $sql = "SELECT * FROM " . $this->table_name . " WHERE lower(cifnif) = " . $this->var2str($cifnif) . ";";
+            $sql = self::SQL_SELECT_ALL . $this->table_name . " WHERE lower(cifnif) = " . $this->var2str($cifnif) . ";";
         }
 
         $data = $this->db->select($sql);
@@ -354,7 +358,7 @@ class cliente extends \fs_model
     public function get_by_email($email)
     {
         $email = mb_strtolower($email, 'UTF8');
-        $sql = "SELECT * FROM " . $this->table_name . " WHERE lower(email) = " . $this->var2str($email) . ";";
+        $sql = self::SQL_SELECT_ALL . $this->table_name . " WHERE lower(email) = " . $this->var2str($email) . ";";
 
         $data = $this->db->select($sql);
         if ($data) {
@@ -379,7 +383,7 @@ class cliente extends \fs_model
             return FALSE;
         }
 
-        return $this->db->select("SELECT * FROM " . $this->table_name . " WHERE codcliente = " . $this->var2str($this->codcliente) . ";");
+        return $this->db->select(self::SQL_SELECT_ALL . $this->table_name . self::PK_WHERE . $this->var2str($this->codcliente) . ";");
     }
 
     /**
@@ -397,139 +401,167 @@ class cliente extends \fs_model
 
     public function test()
     {
-        $status = FALSE;
+        $this->codcliente = is_null($this->codcliente)
+            ? $this->get_new_codigo()
+            : trim($this->codcliente);
 
-        if (is_null($this->codcliente)) {
-            $this->codcliente = $this->get_new_codigo();
-        } else {
-            $this->codcliente = trim($this->codcliente);
-        }
+        $this->sanitizeFields();
+        $this->normalizeFechaBaja();
+        $this->normalizeDiasPago();
 
+        return $this->validateFields();
+    }
+
+    private function sanitizeFields(): void
+    {
         $this->nombre = $this->no_html($this->nombre);
         $this->razonsocial = $this->no_html($this->razonsocial);
         $this->cifnif = $this->no_html($this->cifnif);
         $this->observaciones = $this->no_html($this->observaciones);
+    }
 
-        if ($this->debaja) {
-            if (is_null($this->fechabaja)) {
-                $this->fechabaja = date('d-m-Y');
-            }
-        } else {
+    private function normalizeFechaBaja(): void
+    {
+        if (!$this->debaja) {
             $this->fechabaja = NULL;
+            return;
         }
 
-        $array_dias = array();
-            $diaspago = trim((string) ($this->diaspago ?? ''));
-            if ($diaspago !== '') {
-                foreach (str_getcsv($diaspago) as $d) {
-                    if (intval($d) >= 1 && intval($d) <= 31) {
-                        $array_dias[] = intval($d);
-                    }
+        if (is_null($this->fechabaja)) {
+            $this->fechabaja = date('d-m-Y');
+        }
+    }
+
+    private function normalizeDiasPago(): void
+    {
+        $array_dias = [];
+        $diaspago = trim((string) ($this->diaspago ?? ''));
+
+        if ($diaspago !== '') {
+            foreach (str_getcsv($diaspago) as $d) {
+                if (intval($d) >= 1 && intval($d) <= 31) {
+                    $array_dias[] = intval($d);
+                }
             }
         }
-        $this->diaspago = NULL;
-        if (!empty($array_dias)) {
-            $this->diaspago = join(',', $array_dias);
-        }
 
+        $this->diaspago = !empty($array_dias) ? join(',', $array_dias) : NULL;
+    }
+
+    private function validateFields(): bool
+    {
         if (!preg_match("/^[A-Z0-9]{1,6}$/i", $this->codcliente)) {
             $this->new_error_msg("Código de cliente no válido: " . $this->codcliente);
-        } else if (strlen($this->nombre) < 1 || strlen($this->nombre) > 100) {
-            $this->new_error_msg("Nombre de cliente no válido: " . $this->nombre);
-        } else if (strlen($this->razonsocial) > 100) {
-            $this->new_error_msg("Razón social del cliente no válida: " . $this->razonsocial);
-        } else {
-            $status = TRUE;
+            return false;
         }
 
-        return $status;
+        if (strlen($this->nombre) < 1 || strlen($this->nombre) > 100) {
+            $this->new_error_msg("Nombre de cliente no válido: " . $this->nombre);
+            return false;
+        }
+
+        if (strlen($this->razonsocial) > 100) {
+            $this->new_error_msg("Razón social del cliente no válida: " . $this->razonsocial);
+            return false;
+        }
+
+        return true;
     }
 
     public function save()
     {
-        if ($this->test()) {
-            $this->clean_cache();
-            $use_extension = $this->has_commercial_extension();
-
-            if ($this->exists()) {
-                $sql = "UPDATE " . $this->table_name . " SET nombre = " . $this->var2str($this->nombre)
-                    . ", razonsocial = " . $this->var2str($this->razonsocial)
-                    . ", tipoidfiscal = " . $this->var2str($this->tipoidfiscal)
-                    . ", cifnif = " . $this->var2str($this->cifnif)
-                    . ", telefono1 = " . $this->var2str($this->telefono1)
-                    . ", telefono2 = " . $this->var2str($this->telefono2)
-                    . ", fax = " . $this->var2str($this->fax)
-                    . ", email = " . $this->var2str($this->email)
-                    . ", web = " . $this->var2str($this->web)
-                    . ", codgrupo = " . $this->var2str($this->codgrupo)
-                    . ", debaja = " . $this->var2str($this->debaja)
-                    . ", fechabaja = " . $this->var2str($this->fechabaja)
-                    . ", fechaalta = " . $this->var2str($this->fechaalta)
-                    . ", observaciones = " . $this->var2str($this->observaciones)
-                    . ", regimeniva = " . $this->var2str($this->regimeniva)
-                    . ", recargo = " . $this->var2str($this->recargo)
-                    . ", personafisica = " . $this->var2str($this->personafisica)
-                    . ", diaspago = " . $this->var2str($this->diaspago);
-
-                if (!$use_extension) {
-                    $sql .= ", codserie = " . $this->var2str($this->codserie)
-                        . ", coddivisa = " . $this->var2str($this->coddivisa)
-                        . ", codpago = " . $this->var2str($this->codpago)
-                        . ", codagente = " . $this->var2str($this->codagente)
-                        . ", codproveedor = " . $this->var2str($this->codproveedor)
-                        . ", codtarifa = " . $this->var2str($this->codtarifa);
-                }
-
-                $sql .= "  WHERE codcliente = " . $this->var2str($this->codcliente) . ";";
-            } else {
-                $columns = "codcliente,nombre,razonsocial,tipoidfiscal,cifnif,telefono1,telefono2,fax,email,web,codgrupo,debaja,fechabaja,fechaalta,observaciones,regimeniva,recargo,personafisica,diaspago";
-                $values = $this->var2str($this->codcliente)
-                    . "," . $this->var2str($this->nombre)
-                    . "," . $this->var2str($this->razonsocial)
-                    . "," . $this->var2str($this->tipoidfiscal)
-                    . "," . $this->var2str($this->cifnif)
-                    . "," . $this->var2str($this->telefono1)
-                    . "," . $this->var2str($this->telefono2)
-                    . "," . $this->var2str($this->fax)
-                    . "," . $this->var2str($this->email)
-                    . "," . $this->var2str($this->web)
-                    . "," . $this->var2str($this->codgrupo)
-                    . "," . $this->var2str($this->debaja)
-                    . "," . $this->var2str($this->fechabaja)
-                    . "," . $this->var2str($this->fechaalta)
-                    . "," . $this->var2str($this->observaciones)
-                    . "," . $this->var2str($this->regimeniva)
-                    . "," . $this->var2str($this->recargo)
-                    . "," . $this->var2str($this->personafisica)
-                    . "," . $this->var2str($this->diaspago);
-
-                if (!$use_extension) {
-                    $columns .= ",codserie,coddivisa,codpago,codagente,codproveedor,codtarifa";
-                    $values .= "," . $this->var2str($this->codserie)
-                        . "," . $this->var2str($this->coddivisa)
-                        . "," . $this->var2str($this->codpago)
-                        . "," . $this->var2str($this->codagente)
-                        . "," . $this->var2str($this->codproveedor)
-                        . "," . $this->var2str($this->codtarifa);
-                }
-
-                $sql = "INSERT INTO " . $this->table_name . " (" . $columns . ") VALUES (" . $values . ");";
-            }
-
-            if (!$this->db->exec($sql)) {
-                return FALSE;
-            }
-
-            return $use_extension ? $this->save_commercial_extension() : TRUE;
+        if (!$this->test()) {
+            return FALSE;
         }
 
-        return FALSE;
+        $this->clean_cache();
+        $use_extension = $this->has_commercial_extension();
+
+        $sql = $this->exists()
+            ? $this->buildUpdateSql($use_extension)
+            : $this->buildInsertSql($use_extension);
+
+        if (!$this->db->exec($sql)) {
+            return FALSE;
+        }
+
+        return $use_extension ? $this->save_commercial_extension() : TRUE;
+    }
+
+    private function buildUpdateSql(bool $use_extension): string
+    {
+        $sql = self::SQL_UPDATE . $this->table_name . " SET nombre = " . $this->var2str($this->nombre)
+            . ", razonsocial = " . $this->var2str($this->razonsocial)
+            . ", tipoidfiscal = " . $this->var2str($this->tipoidfiscal)
+            . ", cifnif = " . $this->var2str($this->cifnif)
+            . ", telefono1 = " . $this->var2str($this->telefono1)
+            . ", telefono2 = " . $this->var2str($this->telefono2)
+            . ", fax = " . $this->var2str($this->fax)
+            . ", email = " . $this->var2str($this->email)
+            . ", web = " . $this->var2str($this->web)
+            . ", codgrupo = " . $this->var2str($this->codgrupo)
+            . ", debaja = " . $this->var2str($this->debaja)
+            . ", fechabaja = " . $this->var2str($this->fechabaja)
+            . ", fechaalta = " . $this->var2str($this->fechaalta)
+            . ", observaciones = " . $this->var2str($this->observaciones)
+            . ", regimeniva = " . $this->var2str($this->regimeniva)
+            . ", recargo = " . $this->var2str($this->recargo)
+            . ", personafisica = " . $this->var2str($this->personafisica)
+            . ", diaspago = " . $this->var2str($this->diaspago);
+
+        if (!$use_extension) {
+            $sql .= ", codserie = " . $this->var2str($this->codserie)
+                . ", coddivisa = " . $this->var2str($this->coddivisa)
+                . ", codpago = " . $this->var2str($this->codpago)
+                . ", codagente = " . $this->var2str($this->codagente)
+                . ", codproveedor = " . $this->var2str($this->codproveedor)
+                . ", codtarifa = " . $this->var2str($this->codtarifa);
+        }
+
+        $sql .= self::PK_WHERE . $this->var2str($this->codcliente) . ";";
+        return $sql;
+    }
+
+    private function buildInsertSql(bool $use_extension): string
+    {
+        $columns = "codcliente,nombre,razonsocial,tipoidfiscal,cifnif,telefono1,telefono2,fax,email,web,codgrupo,debaja,fechabaja,fechaalta,observaciones,regimeniva,recargo,personafisica,diaspago";
+        $values = $this->var2str($this->codcliente)
+            . "," . $this->var2str($this->nombre)
+            . "," . $this->var2str($this->razonsocial)
+            . "," . $this->var2str($this->tipoidfiscal)
+            . "," . $this->var2str($this->cifnif)
+            . "," . $this->var2str($this->telefono1)
+            . "," . $this->var2str($this->telefono2)
+            . "," . $this->var2str($this->fax)
+            . "," . $this->var2str($this->email)
+            . "," . $this->var2str($this->web)
+            . "," . $this->var2str($this->codgrupo)
+            . "," . $this->var2str($this->debaja)
+            . "," . $this->var2str($this->fechabaja)
+            . "," . $this->var2str($this->fechaalta)
+            . "," . $this->var2str($this->observaciones)
+            . "," . $this->var2str($this->regimeniva)
+            . "," . $this->var2str($this->recargo)
+            . "," . $this->var2str($this->personafisica)
+            . "," . $this->var2str($this->diaspago);
+
+        if (!$use_extension) {
+            $columns .= ",codserie,coddivisa,codpago,codagente,codproveedor,codtarifa";
+            $values .= "," . $this->var2str($this->codserie)
+                . "," . $this->var2str($this->coddivisa)
+                . "," . $this->var2str($this->codpago)
+                . "," . $this->var2str($this->codagente)
+                . "," . $this->var2str($this->codproveedor)
+                . "," . $this->var2str($this->codtarifa);
+        }
+
+        return "INSERT INTO " . $this->table_name . " (" . $columns . ") VALUES (" . $values . ");";
     }
 
     public function delete()
     {
         $this->clean_cache();
-        $result = $this->db->exec("DELETE FROM " . $this->table_name . " WHERE codcliente = " . $this->var2str($this->codcliente) . ";");
+        $result = $this->db->exec("DELETE FROM " . $this->table_name . self::PK_WHERE . $this->var2str($this->codcliente) . ";");
         if ($result && $this->has_commercial_extension()) {
             $this->delete_commercial_extension();
         }
@@ -591,7 +623,7 @@ class cliente extends \fs_model
 
     public function all($offset = 0)
     {
-        $data = $this->db->select_limit("SELECT * FROM " . $this->table_name . " ORDER BY lower(nombre) ASC", FS_ITEM_LIMIT, $offset);
+        $data = $this->db->select_limit(self::SQL_SELECT_ALL . $this->table_name . " ORDER BY lower(nombre) ASC", FS_ITEM_LIMIT, $offset);
         return $this->all_from_data($data);
     }
 
@@ -602,7 +634,7 @@ class cliente extends \fs_model
     {
         $clientlist = $this->cache->get_array('m_cliente_all');
         if (!$clientlist) {
-            $data = $this->db->select("SELECT * FROM " . $this->table_name . " ORDER BY lower(nombre) ASC;");
+            $data = $this->db->select(self::SQL_SELECT_ALL . $this->table_name . " ORDER BY lower(nombre) ASC;");
             $clientlist = $this->all_from_data($data);
             $this->cache->set('m_cliente_all', $clientlist);
         }
@@ -614,7 +646,7 @@ class cliente extends \fs_model
     {
         $query = mb_strtolower($this->no_html($query), 'UTF8');
 
-        $consulta = "SELECT * FROM " . $this->table_name . " WHERE debaja = FALSE AND ";
+        $consulta = self::SQL_SELECT_ALL . $this->table_name . " WHERE debaja = FALSE AND ";
         if (is_numeric($query)) {
             $consulta .= "(nombre LIKE '%" . $query . "%' OR razonsocial LIKE '%" . $query . "%'"
                 . " OR codcliente LIKE '%" . $query . "%' OR cifnif LIKE '%" . $query . "%'"
@@ -640,7 +672,7 @@ class cliente extends \fs_model
     public function search_by_dni($dni, $offset = 0)
     {
         $query = mb_strtolower($this->no_html($dni), 'UTF8');
-        $consulta = "SELECT * FROM " . $this->table_name . " WHERE debaja = FALSE "
+        $consulta = self::SQL_SELECT_ALL . $this->table_name . " WHERE debaja = FALSE "
             . "AND lower(cifnif) LIKE '" . $query . "%' ORDER BY lower(nombre) ASC";
 
         $data = $this->db->select_limit($consulta, FS_ITEM_LIMIT, $offset);
@@ -666,9 +698,9 @@ class cliente extends \fs_model
      */
     public function fix_db()
     {
-        $this->db->exec("UPDATE " . $this->table_name . " SET debaja = false WHERE debaja IS NULL;");
+        $this->db->exec(self::SQL_UPDATE . $this->table_name . " SET debaja = false WHERE debaja IS NULL;");
 
-        $this->db->exec("UPDATE " . $this->table_name . " SET codgrupo = NULL WHERE codgrupo IS NOT NULL"
+        $this->db->exec(self::SQL_UPDATE . $this->table_name . " SET codgrupo = NULL WHERE codgrupo IS NOT NULL"
             . " AND codgrupo NOT IN (SELECT codgrupo FROM gruposclientes);");
     }
 }
