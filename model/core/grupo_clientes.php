@@ -61,7 +61,8 @@ class grupo_clientes extends \fs_model
     protected function install()
     {
         if (class_exists('tarifa')) {
-            new \tarifa();
+            $tarifa = new \tarifa();
+            // La instancia se crea para asegurar la carga de la clase y su tabla
         }
 
         return '';

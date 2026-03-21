@@ -240,7 +240,8 @@ class cliente extends \fs_model
     protected function install()
     {
         $this->clean_cache();
-        new \grupo_clientes();
+        $grupo = new \grupo_clientes();
+        // La instancia se crea para asegurar la carga de la clase y su tabla
 
         return '';
     }
