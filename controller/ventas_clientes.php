@@ -149,10 +149,11 @@ class ventas_clientes extends clientes_controller
     private function buscar_cliente_json()
     {
         $this->template = FALSE;
+        $search = fs_filter_input_req('buscar_cliente', '');
 
         $cli = new cliente();
         $json = [];
-        foreach ($cli->search($_POST['buscar_cliente']) as $c) {
+        foreach ($cli->search($search) as $c) {
             $nombre = $c->nombre;
             if ($c->nombre != $c->razonsocial) {
                 $nombre .= ' (' . $c->razonsocial . ')';
@@ -161,7 +162,7 @@ class ventas_clientes extends clientes_controller
         }
 
         header('Content-Type: application/json');
-        echo json_encode(['query' => $_POST['buscar_cliente'], 'suggestions' => $json]);
+        echo json_encode(['query' => $search, 'suggestions' => $json]);
     }
 
     private function nuevo_cliente()
