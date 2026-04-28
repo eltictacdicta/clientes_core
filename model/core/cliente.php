@@ -450,18 +450,41 @@ class cliente extends \fs_model
 
     private function validateFields(): bool
     {
-        if (!preg_match("/^[A-Z0-9]{1,6}$/i", $this->codcliente)) {
+        $cod = $this->codcliente ?? '';
+        if (!preg_match("/^[A-Z0-9]{1,6}$/i", $cod)) {
             $this->new_error_msg("Código de cliente no válido: " . $this->codcliente);
             return false;
         }
 
-        if (strlen($this->nombre) < 1 || strlen($this->nombre) > 100) {
+        $nombre = (string) ($this->nombre ?? '');
+        if (strlen($nombre) < 1 || strlen($nombre) > 100) {
             $this->new_error_msg("Nombre de cliente no válido: " . $this->nombre);
             return false;
         }
 
-        if (strlen($this->razonsocial) > 100) {
+        $razonsocial = (string) ($this->razonsocial ?? '');
+        if (strlen($razonsocial) > 100) {
             $this->new_error_msg("Razón social del cliente no válida: " . $this->razonsocial);
+            return false;
+        }
+
+        $email = $this->email ?? '';
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->new_error_msg("Email no válido: " . $this->email);
+            return false;
+        }
+
+        $t1 = (string) ($this->telefono1 ?? '');
+        $t2 = (string) ($this->telefono2 ?? '');
+        $fax = (string) ($this->fax ?? '');
+        if (strlen($t1) > 30 || strlen($t2) > 30 || strlen($fax) > 30) {
+            $this->new_error_msg("Teléfono/fax no válido: longitud excedida.");
+            return false;
+        }
+
+        $cifnif = (string) ($this->cifnif ?? '');
+        if (strlen($cifnif) > 30) {
+            $this->new_error_msg("CIF/NIF no válido: longitud excedida.");
             return false;
         }
 
@@ -645,18 +668,25 @@ class cliente extends \fs_model
     public function search($query, $offset = 0)
     {
         $query = mb_strtolower($this->no_html($query), 'UTF8');
+        $likeQuery = '%' . $query . '%';
+        $startQuery = $query . '%';
 
         $consulta = self::SQL_SELECT_ALL . $this->table_name . " WHERE debaja = FALSE AND ";
         if (is_numeric($query)) {
-            $consulta .= "(nombre LIKE '%" . $query . "%' OR razonsocial LIKE '%" . $query . "%'"
-                . " OR codcliente LIKE '%" . $query . "%' OR cifnif LIKE '%" . $query . "%'"
-                . " OR telefono1 LIKE '" . $query . "%' OR telefono2 LIKE '" . $query . "%'"
-                . " OR observaciones LIKE '%" . $query . "%')";
+            $consulta .= "(nombre LIKE " . $this->var2str($likeQuery)
+                . " OR razonsocial LIKE " . $this->var2str($likeQuery)
+                . " OR codcliente LIKE " . $this->var2str($likeQuery)
+                . " OR cifnif LIKE " . $this->var2str($likeQuery)
+                . " OR telefono1 LIKE " . $this->var2str($startQuery)
+                . " OR telefono2 LIKE " . $this->var2str($startQuery)
+                . " OR observaciones LIKE " . $this->var2str($likeQuery) . ")";
         } else {
-            $buscar = str_replace(' ', '%', $query);
-            $consulta .= "(lower(nombre) LIKE '%" . $buscar . "%' OR lower(razonsocial) LIKE '%" . $buscar . "%'"
-                . " OR lower(cifnif) LIKE '%" . $buscar . "%' OR lower(observaciones) LIKE '%" . $buscar . "%'"
-                . " OR lower(email) LIKE '%" . $buscar . "%')";
+            $buscar = '%' . str_replace(' ', '%', $query) . '%';
+            $consulta .= "(lower(nombre) LIKE " . $this->var2str($buscar)
+                . " OR lower(razonsocial) LIKE " . $this->var2str($buscar)
+                . " OR lower(cifnif) LIKE " . $this->var2str($buscar)
+                . " OR lower(observaciones) LIKE " . $this->var2str($buscar)
+                . " OR lower(email) LIKE " . $this->var2str($buscar) . ")";
         }
         $consulta .= " ORDER BY lower(nombre) ASC";
 
@@ -672,8 +702,9 @@ class cliente extends \fs_model
     public function search_by_dni($dni, $offset = 0)
     {
         $query = mb_strtolower($this->no_html($dni), 'UTF8');
+        $likeQuery = $query . '%';
         $consulta = self::SQL_SELECT_ALL . $this->table_name . " WHERE debaja = FALSE "
-            . "AND lower(cifnif) LIKE '" . $query . "%' ORDER BY lower(nombre) ASC";
+            . "AND lower(cifnif) LIKE " . $this->var2str($likeQuery) . " ORDER BY lower(nombre) ASC";
 
         $data = $this->db->select_limit($consulta, FS_ITEM_LIMIT, $offset);
         return $this->all_from_data($data);

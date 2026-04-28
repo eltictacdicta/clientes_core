@@ -45,6 +45,7 @@ final class ViewHookRegistry
             try {
                 $html .= $twig->render($template, $context);
             } catch (\Throwable $e) {
+                error_log('[ViewHookRegistry] Error rendering hook "' . $hook . '" template "' . $template . '": ' . $e->getMessage());
             }
         }
 

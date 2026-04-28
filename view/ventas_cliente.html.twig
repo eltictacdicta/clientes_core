@@ -201,7 +201,12 @@
                     </div>
                 </div>
 
-                {{ clientes_render_hook('cliente_form_after_main', {'fsc': fsc, 'cliente': cliente}) }}
+                {{ clientes_render_hook('cliente_form_after_main', {'fsc': fsc, 'cliente': cliente})|raw }}
+
+                <form id="form_delete_cliente" method="post" action="{{ cliente.url() }}" style="display:none;">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="action" value="delete" />
+                </form>
 
                 <div class="row" style="margin-top: 10px;">
                     <div class="col-xs-4">
@@ -273,10 +278,14 @@
                         </td>
                         {% if fsc.allow_delete %}
                         <td class="text-right">
-                            <a href="{{ cliente.url() }}&action=delete_dir&dir_id={{ dir.id }}" class="btn btn-xs btn-danger"
-                                onclick="return confirm('{{ trans('confirmar-eliminar') }}');">
-                                <i class="fa fa-trash"></i>
-                            </a>
+                            <form method="post" style="display:inline;" onsubmit="return confirm('{{ trans('confirmar-eliminar') }}');">
+                                {{ csrf_field() }}
+                                <input type="hidden" name="action" value="delete_dir" />
+                                <input type="hidden" name="dir_id" value="{{ dir.id }}" />
+                                <button type="submit" class="btn btn-xs btn-danger">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </form>
                         </td>
                         {% endif %}
                     </tr>
@@ -363,7 +372,7 @@
                         </div>
                     </div>
 
-                    {{ clientes_render_hook('cliente_direccion_form_after_codpais', {'fsc': fsc, 'cliente': cliente}) }}
+                    {{ clientes_render_hook('cliente_direccion_form_after_codpais', {'fsc': fsc, 'cliente': cliente})|raw }}
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">{{ trans('cancelar') }}</button>
@@ -385,7 +394,7 @@
                 title: '<b>{{ trans("eliminar-cliente") }}</b>',
                 callback: function (result) {
                     if (result) {
-                        window.location.href = '{{ cliente.url()|raw }}&action=delete';
+                        $("#form_delete_cliente").submit();
                     }
                 }
             });

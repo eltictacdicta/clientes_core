@@ -17,7 +17,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-require_once 'plugins/clientes_core/extras/clientes_controller.php';
+require_once dirname(__DIR__) . '/extras/clientes_controller.php';
+require_once dirname(__DIR__, 3) . '/src/Security/CsrfManager.php';
+
+use FSFramework\Security\CsrfManager;
 
 /**
  * Controlador del listado de clientes.
@@ -71,15 +74,15 @@ class ventas_clientes extends clientes_controller
         $grupo_model = new grupo_clientes();
         $this->grupos = $grupo_model->all();
 
-        if (isset($_POST['buscar_cliente'])) {
+        if (filter_input(INPUT_POST, 'buscar_cliente')) {
             $this->buscar_cliente_json();
-        } else if (isset($_GET['delete_grupo'])) {
+        } else if (filter_input(INPUT_POST, 'action') === 'delete_grupo' && CsrfManager::isValid(filter_input(INPUT_POST, '_csrf_token') ?? '')) {
             $this->delete_grupo();
-        } else if (isset($_POST['nuevo_grupo'])) {
+        } else if (filter_input(INPUT_POST, 'nuevo_grupo')) {
             $this->nuevo_grupo();
-        } else if (isset($_POST['codcliente'])) {
+        } else if (filter_input(INPUT_POST, 'codcliente')) {
             $this->nuevo_cliente();
-        } else if (isset($_GET['delete'])) {
+        } else if (filter_input(INPUT_POST, 'action') === 'delete' && CsrfManager::isValid(filter_input(INPUT_POST, '_csrf_token') ?? '')) {
             $this->delete_cliente();
         } else {
             $this->load_clientes();
@@ -158,7 +161,7 @@ class ventas_clientes extends clientes_controller
             if ($c->nombre != $c->razonsocial) {
                 $nombre .= ' (' . $c->razonsocial . ')';
             }
-            $json[] = ['value' => $c->nombre, 'data' => $c->codcliente, 'full' => $c];
+            $json[] = ['value' => $c->nombre, 'data' => $c->codcliente];
         }
 
         header('Content-Type: application/json');
@@ -168,13 +171,13 @@ class ventas_clientes extends clientes_controller
     private function nuevo_cliente()
     {
         $cliente = new cliente();
-        $cliente->codcliente = $_POST['codcliente'] ?? null;
-        $cliente->nombre = $_POST['nombre'] ?? '';
-        $cliente->razonsocial = $_POST['razonsocial'] ?? $_POST['nombre'] ?? '';
-        $cliente->cifnif = $_POST['cifnif'] ?? '';
-        $cliente->telefono1 = $_POST['telefono1'] ?? '';
-        $cliente->email = $_POST['email'] ?? '';
-        $cliente->codgrupo = !empty($_POST['codgrupo']) ? $_POST['codgrupo'] : null;
+        $cliente->codcliente = filter_input(INPUT_POST, 'codcliente');
+        $cliente->nombre = filter_input(INPUT_POST, 'nombre') ?? '';
+        $cliente->razonsocial = filter_input(INPUT_POST, 'razonsocial') ?: filter_input(INPUT_POST, 'nombre') ?? '';
+        $cliente->cifnif = filter_input(INPUT_POST, 'cifnif') ?? '';
+        $cliente->telefono1 = filter_input(INPUT_POST, 'telefono1') ?? '';
+        $cliente->email = filter_input(INPUT_POST, 'email') ?? '';
+        $cliente->codgrupo = !empty(filter_input(INPUT_POST, 'codgrupo')) ? filter_input(INPUT_POST, 'codgrupo') : null;
 
         if ($cliente->save()) {
             header('Location: ' . $cliente->url());
@@ -192,8 +195,9 @@ class ventas_clientes extends clientes_controller
             return;
         }
 
+        $cod = filter_input(INPUT_POST, 'codcliente', FILTER_SANITIZE_SPECIAL_CHARS);
         $cliente = new cliente();
-        $cli = $cliente->get($_GET['delete']);
+        $cli = $cliente->get($cod);
         if ($cli) {
             if ($cli->delete()) {
                 $this->new_message('Cliente eliminado correctamente.');
@@ -211,7 +215,7 @@ class ventas_clientes extends clientes_controller
     {
         $grupo = new grupo_clientes();
         $grupo->codgrupo = $grupo->get_new_codigo();
-        $grupo->nombre = $_POST['nuevo_grupo'] ?? '';
+        $grupo->nombre = filter_input(INPUT_POST, 'nuevo_grupo') ?? '';
 
         if ($grupo->save()) {
             $this->new_message('Grupo guardado correctamente.');
@@ -231,8 +235,9 @@ class ventas_clientes extends clientes_controller
             return;
         }
 
+        $cod = filter_input(INPUT_POST, 'codgrupo', FILTER_SANITIZE_SPECIAL_CHARS);
         $grupo = new grupo_clientes();
-        $g = $grupo->get($_GET['delete_grupo']);
+        $g = $grupo->get($cod);
         if ($g) {
             if ($g->delete()) {
                 $this->new_message('Grupo eliminado correctamente.');

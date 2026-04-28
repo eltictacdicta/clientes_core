@@ -18,7 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-require_once 'plugins/clientes_core/model/core/grupo_clientes.php';
+require_once __DIR__ . '/core/grupo_clientes.php';
 
 /**
  * Wrapper global para compatibilidad con código legacy.

@@ -79,6 +79,11 @@
             </div>
         </div>
 
+        <form id="form_delete_grupo" method="post" action="{{ grupo.url() }}" style="display:none;">
+            {{ csrf_field() }}
+            <input type="hidden" name="action" value="delete" />
+        </form>
+
         {# Clientes en este grupo #}
         <div class="col-sm-8">
             <div class="panel panel-default">
@@ -156,7 +161,7 @@
                 title: '<b>{{ trans("eliminar-grupo") }}</b>',
                 callback: function (result) {
                     if (result) {
-                        window.location.href = '{{ grupo.url()|raw }}&action=delete';
+                        $("#form_delete_grupo").submit();
                     }
                 }
             });

@@ -110,7 +110,7 @@ class Init
                 }
 
                 return ViewHookRegistry::render($twig, $hook, is_array($context) ? $context : []);
-            }, ['is_safe' => ['html']]));
+            }));
         } catch (\LogicException) {
         }
     }

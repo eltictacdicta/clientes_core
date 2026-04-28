@@ -131,10 +131,14 @@
                         </td>
                         {% if fsc.allow_delete %}
                         <td class="text-right">
-                            <a href="{{ fsc.url() }}&delete={{ cli.codcliente }}" class="btn btn-xs btn-danger"
-                                onclick="return confirm('{{ trans('confirmar-eliminar') }}');">
-                                <i class="fa fa-trash"></i>
-                            </a>
+                            <form method="post" style="display:inline;" onsubmit="return confirm('{{ trans('confirmar-eliminar') }}');">
+                                {{ csrf_field() }}
+                                <input type="hidden" name="action" value="delete" />
+                                <input type="hidden" name="codcliente" value="{{ cli.codcliente }}" />
+                                <button type="submit" class="btn btn-xs btn-danger">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </form>
                         </td>
                         {% endif %}
                     </tr>
@@ -191,10 +195,14 @@
                                             <i class="fa fa-pencil"></i>
                                         </a>
                                         {% if fsc.allow_delete %}
-                                        <a href="{{ fsc.url() }}&delete_grupo={{ g.codgrupo }}" class="btn btn-xs btn-danger"
-                                            onclick="return confirm('{{ trans('confirmar-eliminar') }}');">
-                                            <i class="fa fa-trash"></i>
-                                        </a>
+                                        <form method="post" style="display:inline;" onsubmit="return confirm('{{ trans('confirmar-eliminar') }}');">
+                                            {{ csrf_field() }}
+                                            <input type="hidden" name="action" value="delete_grupo" />
+                                            <input type="hidden" name="codgrupo" value="{{ g.codgrupo }}" />
+                                            <button type="submit" class="btn btn-xs btn-danger">
+                                                <i class="fa fa-trash"></i>
+                                            </button>
+                                        </form>
                                         {% endif %}
                                     </td>
                                 </tr>

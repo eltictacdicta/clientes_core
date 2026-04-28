@@ -17,7 +17,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-require_once 'plugins/clientes_core/extras/clientes_controller.php';
+require_once dirname(__DIR__) . '/extras/clientes_controller.php';
+require_once dirname(__DIR__, 3) . '/src/Security/CsrfManager.php';
+
+use FSFramework\Security\CsrfManager;
 
 /**
  * Controlador del detalle de un grupo de clientes.
@@ -67,7 +70,11 @@ class ventas_grupo extends clientes_controller
                         break;
 
                     case 'delete':
-                        $this->delete_grupo();
+                        if (CsrfManager::isValid(filter_input(INPUT_POST, '_csrf_token') ?? '')) {
+                            $this->delete_grupo();
+                        } else {
+                            $this->new_error_msg('Token de seguridad no válido.');
+                        }
                         return;
 
                     default:
@@ -114,8 +121,8 @@ class ventas_grupo extends clientes_controller
 
     private function save_grupo()
     {
-        $this->grupo->nombre = $_POST['nombre'] ?? $this->grupo->nombre;
-        $this->grupo->codtarifa = !empty($_POST['codtarifa']) ? $_POST['codtarifa'] : null;
+        $this->grupo->nombre = filter_input(INPUT_POST, 'nombre') ?? $this->grupo->nombre;
+        $this->grupo->codtarifa = !empty(filter_input(INPUT_POST, 'codtarifa')) ? filter_input(INPUT_POST, 'codtarifa') : null;
 
         if ($this->grupo->save()) {
             $this->new_message('Grupo guardado correctamente.');

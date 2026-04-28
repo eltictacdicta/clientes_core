@@ -141,6 +141,16 @@ class direccion_cliente extends \fs_model
             return false;
         }
 
+        if (strlen((string) ($this->codpostal ?? '')) > 10) {
+            $this->new_error_msg("Código postal no válido: longitud excedida.");
+            return false;
+        }
+
+        if (strlen((string) ($this->codpais ?? '')) > 20) {
+            $this->new_error_msg("Código de país no válido: longitud excedida.");
+            return false;
+        }
+
         return true;
     }
 

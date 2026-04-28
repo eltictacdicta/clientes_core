@@ -17,7 +17,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-require_once 'plugins/clientes_core/extras/clientes_controller.php';
+require_once dirname(__DIR__) . '/extras/clientes_controller.php';
+require_once dirname(__DIR__, 3) . '/src/Security/CsrfManager.php';
+
+use FSFramework\Security\CsrfManager;
 
 /**
  * Controlador del detalle de un cliente.
@@ -70,7 +73,11 @@ class ventas_cliente extends clientes_controller
                         break;
 
                     case 'delete':
-                        $this->delete_cliente();
+                        if (CsrfManager::isValid(filter_input(INPUT_POST, '_csrf_token') ?? '')) {
+                            $this->delete_cliente();
+                        } else {
+                            $this->new_error_msg('Token de seguridad no válido.');
+                        }
                         return;
 
                     case 'save_dir':
@@ -78,7 +85,11 @@ class ventas_cliente extends clientes_controller
                         break;
 
                     case 'delete_dir':
-                        $this->delete_direccion();
+                        if (CsrfManager::isValid(filter_input(INPUT_POST, '_csrf_token') ?? '')) {
+                            $this->delete_direccion();
+                        } else {
+                            $this->new_error_msg('Token de seguridad no válido.');
+                        }
                         break;
 
                     case 'new_dir':
@@ -99,25 +110,26 @@ class ventas_cliente extends clientes_controller
 
     private function save_cliente()
     {
-        $this->cliente->nombre = $_POST['nombre'] ?? $this->cliente->nombre;
-        $this->cliente->razonsocial = $_POST['razonsocial'] ?? $this->cliente->razonsocial;
-        $this->cliente->tipoidfiscal = $_POST['tipoidfiscal'] ?? $this->cliente->tipoidfiscal;
-        $this->cliente->cifnif = $_POST['cifnif'] ?? $this->cliente->cifnif;
-        $this->cliente->telefono1 = $_POST['telefono1'] ?? $this->cliente->telefono1;
-        $this->cliente->telefono2 = $_POST['telefono2'] ?? $this->cliente->telefono2;
-        $this->cliente->fax = $_POST['fax'] ?? $this->cliente->fax;
-        $this->cliente->email = $_POST['email'] ?? $this->cliente->email;
-        $this->cliente->web = $_POST['web'] ?? $this->cliente->web;
-        $this->cliente->coddivisa = !empty($_POST['coddivisa']) ? $_POST['coddivisa'] : null;
-        $this->cliente->codgrupo = !empty($_POST['codgrupo']) ? $_POST['codgrupo'] : null;
-        $this->cliente->regimeniva = $_POST['regimeniva'] ?? $this->cliente->regimeniva;
-        $this->cliente->recargo = isset($_POST['recargo']) && $_POST['recargo'] == '1';
-        $this->cliente->personafisica = isset($_POST['personafisica']) && $_POST['personafisica'] == '1';
-        $this->cliente->diaspago = $_POST['diaspago'] ?? $this->cliente->diaspago;
-        $this->cliente->observaciones = $_POST['observaciones'] ?? $this->cliente->observaciones;
+        $this->cliente->nombre = filter_input(INPUT_POST, 'nombre') ?? $this->cliente->nombre;
+        $this->cliente->razonsocial = filter_input(INPUT_POST, 'razonsocial') ?? $this->cliente->razonsocial;
+        $this->cliente->tipoidfiscal = filter_input(INPUT_POST, 'tipoidfiscal') ?? $this->cliente->tipoidfiscal;
+        $this->cliente->cifnif = filter_input(INPUT_POST, 'cifnif') ?? $this->cliente->cifnif;
+        $this->cliente->telefono1 = filter_input(INPUT_POST, 'telefono1') ?? $this->cliente->telefono1;
+        $this->cliente->telefono2 = filter_input(INPUT_POST, 'telefono2') ?? $this->cliente->telefono2;
+        $this->cliente->fax = filter_input(INPUT_POST, 'fax') ?? $this->cliente->fax;
+        $this->cliente->email = filter_input(INPUT_POST, 'email') ?? $this->cliente->email;
+        $this->cliente->web = filter_input(INPUT_POST, 'web') ?? $this->cliente->web;
+        $this->cliente->coddivisa = !empty(filter_input(INPUT_POST, 'coddivisa')) ? filter_input(INPUT_POST, 'coddivisa') : null;
+        $this->cliente->codgrupo = !empty(filter_input(INPUT_POST, 'codgrupo')) ? filter_input(INPUT_POST, 'codgrupo') : null;
+        $this->cliente->regimeniva = filter_input(INPUT_POST, 'regimeniva') ?? $this->cliente->regimeniva;
+        $this->cliente->recargo = filter_input(INPUT_POST, 'recargo') === '1';
+        $this->cliente->personafisica = filter_input(INPUT_POST, 'personafisica') === '1';
+        $this->cliente->diaspago = filter_input(INPUT_POST, 'diaspago') ?? $this->cliente->diaspago;
+        $this->cliente->observaciones = filter_input(INPUT_POST, 'observaciones') ?? $this->cliente->observaciones;
 
-        if (isset($_POST['debaja'])) {
-            $this->cliente->debaja = $_POST['debaja'] == '1';
+        $debaja = filter_input(INPUT_POST, 'debaja');
+        if ($debaja !== null) {
+            $this->cliente->debaja = $debaja === '1';
         }
 
         if ($this->cliente->save()) {
@@ -153,20 +165,24 @@ class ventas_cliente extends clientes_controller
                 $this->new_error_msg('Dirección no encontrada.');
                 return;
             }
+            if ($dir->codcliente !== $this->cliente->codcliente) {
+                $this->new_error_msg('La dirección no pertenece a este cliente.');
+                return;
+            }
         } else {
             $dir = new direccion_cliente();
             $dir->codcliente = $this->cliente->codcliente;
         }
 
-        $dir->descripcion = $_POST['descripcion'] ?? $dir->descripcion;
-        $dir->direccion = $_POST['direccion'] ?? $dir->direccion;
-        $dir->ciudad = $_POST['ciudad'] ?? $dir->ciudad;
-        $dir->provincia = $_POST['provincia'] ?? $dir->provincia;
-        $dir->codpostal = $_POST['codpostal'] ?? $dir->codpostal;
-        $dir->codpais = $_POST['codpais'] ?? $dir->codpais;
-        $dir->apartado = $_POST['apartado'] ?? $dir->apartado;
-        $dir->domenvio = isset($_POST['domenvio']) && $_POST['domenvio'] == '1';
-        $dir->domfacturacion = isset($_POST['domfacturacion']) && $_POST['domfacturacion'] == '1';
+        $dir->descripcion = filter_input(INPUT_POST, 'descripcion') ?? $dir->descripcion;
+        $dir->direccion = filter_input(INPUT_POST, 'direccion') ?? $dir->direccion;
+        $dir->ciudad = filter_input(INPUT_POST, 'ciudad') ?? $dir->ciudad;
+        $dir->provincia = filter_input(INPUT_POST, 'provincia') ?? $dir->provincia;
+        $dir->codpostal = filter_input(INPUT_POST, 'codpostal') ?? $dir->codpostal;
+        $dir->codpais = filter_input(INPUT_POST, 'codpais') ?? $dir->codpais;
+        $dir->apartado = filter_input(INPUT_POST, 'apartado') ?? $dir->apartado;
+        $dir->domenvio = filter_input(INPUT_POST, 'domenvio') === '1';
+        $dir->domfacturacion = filter_input(INPUT_POST, 'domfacturacion') === '1';
 
         if ($dir->save()) {
             $this->new_message('Dirección guardada correctamente.');
@@ -182,11 +198,11 @@ class ventas_cliente extends clientes_controller
             return;
         }
 
-        $dir_id = filter_input(INPUT_GET, 'dir_id', FILTER_VALIDATE_INT);
+        $dir_id = filter_input(INPUT_POST, 'dir_id', FILTER_VALIDATE_INT);
         if ($dir_id) {
             $dir_model = new direccion_cliente();
             $dir = $dir_model->get($dir_id);
-            if ($dir && $dir->delete()) {
+            if ($dir && $dir->codcliente === $this->cliente->codcliente && $dir->delete()) {
                 $this->new_message('Dirección eliminada correctamente.');
             } else {
                 $this->new_error_msg('Error al eliminar la dirección.');
