@@ -77,4 +77,22 @@ class clientes_controller extends fs_controller
 
         return count($paginas) > 1 ? $paginas : [];
     }
+
+    /**
+     * Guard CSRF estricto para operaciones mutantes del plugin.
+     *
+     * @param callable|null $onFailure Callback opcional tras rechazar la petición
+     */
+    protected function requireMutationCsrf(?callable $onFailure = null): bool
+    {
+        if ($this->requireCsrf()) {
+            return true;
+        }
+
+        if ($onFailure !== null) {
+            $onFailure();
+        }
+
+        return false;
+    }
 }

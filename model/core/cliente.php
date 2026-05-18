@@ -504,11 +504,50 @@ class cliente extends \fs_model
             ? $this->buildUpdateSql($use_extension)
             : $this->buildInsertSql($use_extension);
 
-        if (!$this->db->exec($sql)) {
-            return FALSE;
+        if (!$use_extension) {
+            if (!$this->db->exec($sql)) {
+                $this->new_error_msg('Error al guardar el cliente: ' . $this->db->get_error_msg());
+                return FALSE;
+            }
+
+            return TRUE;
         }
 
-        return $use_extension ? $this->save_commercial_extension() : TRUE;
+        $autoTransactions = $this->db->get_auto_transactions();
+        $this->db->set_auto_transactions(FALSE);
+
+        try {
+            if (!$this->db->begin_transaction()) {
+                $this->new_error_msg('Error al iniciar la transacción del cliente: ' . $this->db->get_error_msg());
+                return FALSE;
+            }
+
+            if (!$this->db->exec($sql, FALSE)) {
+                $this->db->rollback();
+                $this->new_error_msg('Error al guardar el cliente: ' . $this->db->get_error_msg());
+                return FALSE;
+            }
+
+            if (!$this->save_commercial_extension()) {
+                $this->db->rollback();
+                $this->new_error_msg('Error al guardar los datos comerciales del cliente.');
+                return FALSE;
+            }
+
+            if (!$this->db->commit()) {
+                $this->db->rollback();
+                $this->new_error_msg('Error al confirmar los datos del cliente: ' . $this->db->get_error_msg());
+                return FALSE;
+            }
+
+            return TRUE;
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            $this->new_error_msg('Error al guardar el cliente: ' . $e->getMessage());
+            return FALSE;
+        } finally {
+            $this->db->set_auto_transactions($autoTransactions);
+        }
     }
 
     private function buildUpdateSql(bool $use_extension): string

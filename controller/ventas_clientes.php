@@ -18,9 +18,6 @@
  */
 
 require_once dirname(__DIR__) . '/extras/clientes_controller.php';
-require_once dirname(__DIR__, 3) . '/src/Security/CsrfManager.php';
-
-use FSFramework\Security\CsrfManager;
 
 /**
  * Controlador del listado de clientes.
@@ -76,14 +73,22 @@ class ventas_clientes extends clientes_controller
 
         if (filter_input(INPUT_POST, 'buscar_cliente')) {
             $this->buscar_cliente_json();
-        } else if (filter_input(INPUT_POST, 'action') === 'delete_grupo' && CsrfManager::isValid(filter_input(INPUT_POST, '_csrf_token') ?? '')) {
-            $this->delete_grupo();
+        } else if (filter_input(INPUT_POST, 'action') === 'delete_grupo') {
+            if ($this->requireMutationCsrf(fn() => $this->load_clientes())) {
+                $this->delete_grupo();
+            }
         } else if (filter_input(INPUT_POST, 'nuevo_grupo')) {
-            $this->nuevo_grupo();
+            if ($this->requireMutationCsrf(fn() => $this->load_clientes())) {
+                $this->nuevo_grupo();
+            }
         } else if (filter_input(INPUT_POST, 'codcliente')) {
-            $this->nuevo_cliente();
-        } else if (filter_input(INPUT_POST, 'action') === 'delete' && CsrfManager::isValid(filter_input(INPUT_POST, '_csrf_token') ?? '')) {
-            $this->delete_cliente();
+            if ($this->requireMutationCsrf(fn() => $this->load_clientes())) {
+                $this->nuevo_cliente();
+            }
+        } else if (filter_input(INPUT_POST, 'action') === 'delete') {
+            if ($this->requireMutationCsrf(fn() => $this->load_clientes())) {
+                $this->delete_cliente();
+            }
         } else {
             $this->load_clientes();
         }
@@ -171,7 +176,7 @@ class ventas_clientes extends clientes_controller
     private function nuevo_cliente()
     {
         $cliente = new cliente();
-        $cliente->codcliente = filter_input(INPUT_POST, 'codcliente');
+        $cliente->codcliente = filter_input(INPUT_POST, 'codcliente') ?: null;
         $cliente->nombre = filter_input(INPUT_POST, 'nombre') ?? '';
         $cliente->razonsocial = filter_input(INPUT_POST, 'razonsocial') ?: filter_input(INPUT_POST, 'nombre') ?? '';
         $cliente->cifnif = filter_input(INPUT_POST, 'cifnif') ?? '';
@@ -181,8 +186,14 @@ class ventas_clientes extends clientes_controller
 
         if ($cliente->save()) {
             header('Location: ' . $cliente->url());
+            exit();
         } else {
-            $this->new_error_msg('Error al guardar el cliente.');
+            foreach ($cliente->get_errors() as $error) {
+                $this->new_error_msg($error);
+            }
+            if (empty($cliente->get_errors())) {
+                $this->new_error_msg('Error al guardar el cliente. Verifique los datos e inténtelo de nuevo.');
+            }
             $this->load_clientes();
         }
     }

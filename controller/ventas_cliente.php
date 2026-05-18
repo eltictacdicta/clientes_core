@@ -110,6 +110,10 @@ class ventas_cliente extends clientes_controller
 
     private function save_cliente()
     {
+        if (!$this->requireMutationCsrf()) {
+            return;
+        }
+
         $this->cliente->nombre = filter_input(INPUT_POST, 'nombre') ?? $this->cliente->nombre;
         $this->cliente->razonsocial = filter_input(INPUT_POST, 'razonsocial') ?? $this->cliente->razonsocial;
         $this->cliente->tipoidfiscal = filter_input(INPUT_POST, 'tipoidfiscal') ?? $this->cliente->tipoidfiscal;
@@ -134,8 +138,14 @@ class ventas_cliente extends clientes_controller
 
         if ($this->cliente->save()) {
             $this->new_message('Cliente guardado correctamente.');
-        } else {
-            $this->new_error_msg('Error al guardar el cliente.');
+            return;
+        }
+
+        foreach ($this->cliente->get_errors() as $error) {
+            $this->new_error_msg($error);
+        }
+        if (empty($this->cliente->get_errors())) {
+            $this->new_error_msg('Error al guardar el cliente. Verifique los datos e inténtelo de nuevo.');
         }
     }
 
@@ -156,6 +166,10 @@ class ventas_cliente extends clientes_controller
 
     private function save_direccion()
     {
+        if (!$this->requireMutationCsrf()) {
+            return;
+        }
+
         $dir_id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 
         if ($dir_id) {

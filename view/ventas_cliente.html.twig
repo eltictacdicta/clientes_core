@@ -46,7 +46,7 @@
             </h3>
         </div>
         <div class="panel-body">
-            <form action="{{ cliente.url() }}" method="post">
+            <form id="form_edit_cliente" action="{{ cliente.url() }}" method="post">
                 {{ csrf_field() }}
                 <input type="hidden" name="action" value="save_cliente" />
                 <input type="hidden" name="codcliente" value="{{ cliente.codcliente }}" />
@@ -203,11 +203,6 @@
 
                 {{ clientes_render_hook('cliente_form_after_main', {'fsc': fsc, 'cliente': cliente})|raw }}
 
-                <form id="form_delete_cliente" method="post" action="{{ cliente.url() }}" style="display:none;">
-                    {{ csrf_field() }}
-                    <input type="hidden" name="action" value="delete" />
-                </form>
-
                 <div class="row" style="margin-top: 10px;">
                     <div class="col-xs-4">
                         {% if fsc.allow_delete %}
@@ -228,6 +223,10 @@
                         </button>
                     </div>
                 </div>
+            </form>
+            <form id="form_delete_cliente" method="post" action="{{ cliente.url() }}" style="display:none;">
+                {{ csrf_field() }}
+                <input type="hidden" name="action" value="delete" />
             </form>
         </div>
     </div>
