@@ -171,7 +171,7 @@
         <nombre>tipoidfiscal</nombre>
         <tipo>character varying(25)</tipo>
         <nulo>NO</nulo>
-        <defecto>'NIF'::character varying</defecto>
+        <defecto>NIF</defecto>
     </columna>
     <columna>
         <nombre>personafisica</nombre>
