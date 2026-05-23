@@ -47,21 +47,19 @@ class ventas_clientes extends clientes_controller
 
         $this->allow_delete = $this->user->allow_delete_on($this->class_name);
         $this->offset = 0;
-        if (isset($_GET['offset'])) {
-            $this->offset = intval($_GET['offset']);
-        }
+        $offset = fs_filter_input_req('offset', '0');
+        $this->offset = intval($offset);
 
         $this->orden = 'lower(nombre) ASC';
-        if (isset($_GET['orden'])) {
-            $ordenes = [
-                'nombre' => 'lower(nombre) ASC',
-                'codcliente' => 'codcliente ASC',
-                'fechaalta' => 'fechaalta DESC',
-                'cifnif' => 'cifnif ASC',
-            ];
-            if (isset($ordenes[$_GET['orden']])) {
-                $this->orden = $ordenes[$_GET['orden']];
-            }
+        $ordenKey = fs_filter_input_req('orden', '');
+        $ordenes = [
+            'nombre' => 'lower(nombre) ASC',
+            'codcliente' => 'codcliente ASC',
+            'fechaalta' => 'fechaalta DESC',
+            'cifnif' => 'cifnif ASC',
+        ];
+        if ($ordenKey !== '' && isset($ordenes[$ordenKey])) {
+            $this->orden = $ordenes[$ordenKey];
         }
 
         $this->query = '';
