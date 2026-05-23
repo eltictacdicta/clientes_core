@@ -204,7 +204,13 @@ class ventas_clientes extends clientes_controller
             return;
         }
 
-        $cod = filter_input(INPUT_POST, 'codcliente', FILTER_SANITIZE_SPECIAL_CHARS);
+        $cod = trim((string) (filter_input(INPUT_POST, 'codcliente') ?? ''));
+        if ($cod === '' || !preg_match('/^\d{1,6}$/', $cod)) {
+            $this->new_error_msg('Cliente no encontrado.');
+            $this->load_clientes();
+            return;
+        }
+
         $cliente = new cliente();
         $cli = $cliente->get($cod);
         if ($cli) {
@@ -244,7 +250,14 @@ class ventas_clientes extends clientes_controller
             return;
         }
 
-        $cod = filter_input(INPUT_POST, 'codgrupo', FILTER_SANITIZE_SPECIAL_CHARS);
+        $cod = trim((string) (filter_input(INPUT_POST, 'codgrupo') ?? ''));
+        if ($cod === '' || !preg_match('/^\d{1,6}$/', $cod)) {
+            $this->new_error_msg('Grupo no encontrado.');
+            $this->grupos = (new grupo_clientes())->all();
+            $this->load_clientes();
+            return;
+        }
+
         $grupo = new grupo_clientes();
         $g = $grupo->get($cod);
         if ($g) {
