@@ -60,6 +60,18 @@ final class VentasClientesDispatchTest extends TestCase
             public function allow_delete_on($page) { return false; }
         };
 
+        // class_name (protected on fs_controller line 84) and page (public
+        // line 144) are normally set by fs_controller::__construct().
+        // url() (line 702) returns $this->page->url(), so we must populate
+        // both for the listing branch to function.
+        $classNameProp = new \ReflectionProperty(\fs_controller::class, 'class_name');
+        $classNameProp->setAccessible(true);
+        $classNameProp->setValue($this->controller, \ventas_clientes::class);
+
+        $this->controller->page = new class {
+            public function url() { return 'index.php?page=ventas_clientes'; }
+        };
+
         // core_log and cache are protected on fs_app, normally set by fs_app::__construct.
         // newInstanceWithoutConstructor skips that, so we must populate them.
         $coreLogProp = new \ReflectionProperty(\fs_app::class, 'core_log');
@@ -69,6 +81,18 @@ final class VentasClientesDispatchTest extends TestCase
         $cacheProp = new \ReflectionProperty(\fs_app::class, 'cache');
         $cacheProp->setAccessible(true);
         $cacheProp->setValue($this->controller, new \fs_cache());
+
+        // db (protected on fs_controller line 90). The listing branch in
+        // loadAllClientes() calls $this->db->select_limit() and select().
+        // Provide a no-op stub so no real DB is touched.
+        $dbProp = new \ReflectionProperty(\fs_controller::class, 'db');
+        $dbProp->setAccessible(true);
+        $dbProp->setValue($this->controller, new class {
+            public function select_limit($sql, $limit, $offset) { return []; }
+            public function select($sql) { return []; }
+            public function exec($sql) { return true; }
+            public function var2str($v) { return is_string($v) ? ("'" . addslashes($v) . "'") : (string)(int)$v; }
+        });
 
         // request (protected on fs_controller line 58)
         $requestProp = new \ReflectionProperty(\fs_controller::class, 'request');
@@ -100,10 +124,26 @@ final class VentasClientesDispatchTest extends TestCase
 
     private function resetCoreLog(): void
     {
-        $ref = new \ReflectionClass('fs_model');
-        $prop = $ref->getProperty('core_log');
+        $ref = new \ReflectionClass(\fs_core_log::class);
+        $prop = $ref->getProperty('data_log');
         $prop->setAccessible(true);
-        $prop->setValue(null, new \fs_core_log());
+        $prop->setValue(null, []);
+
+        // Reset the static controller_name too. fs_core_log::__construct()
+        // only sets it when empty, so a previous test that set a different
+        // name would shadow ours and make fs_controller::new_error_msg()
+        // skip the 'errors' channel (it only writes to 'errors' when
+        // class_name == controller_name()).
+        $nameProp = $ref->getProperty('controller_name');
+        $nameProp->setAccessible(true);
+        $nameProp->setValue(null, null);
+
+        // Also reset the static core_log on fs_model so the next test gets
+        // a fresh instance via fs_model's lazy init.
+        $modelRef = new \ReflectionClass('fs_model');
+        $modelProp = $modelRef->getProperty('core_log');
+        $modelProp->setAccessible(true);
+        $modelProp->setValue(null, new \fs_core_log());
     }
 
     /** @var callable|null The autoloader callback, stored so we can unregister in tearDown. */
@@ -154,7 +194,7 @@ final class VentasClientesDispatchTest extends TestCase
             public function delete(): bool { return false; }
             public function exists(): bool { return false; }
             public function test(): bool { $this->codcliente = $this->codcliente ?? "000001"; return true; }
-            public function save(): bool { return true; }
+            public function save(): bool { return $this->test(); }
             public function url(): string { return "index.php?page=ventas_cliente&cod=" . $this->codcliente; }
             public function get_errors(): array { return []; }
             public function search($q = "", $offset = 0) { return []; }
