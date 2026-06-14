@@ -245,6 +245,7 @@
         <div class="modal-content">
             <form action="{{ fsc.url() }}" method="post">
                 {{ csrf_field() }}
+                <input type="hidden" name="action" value="nuevo_cliente"/>
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
                     <h4 class="modal-title">{{ trans('nuevo-cliente') }}</h4>

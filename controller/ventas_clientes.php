@@ -69,21 +69,21 @@ class ventas_clientes extends clientes_controller
         $grupo_model = new grupo_clientes();
         $this->grupos = $grupo_model->all();
 
-        if (filter_input(INPUT_POST, 'buscar_cliente')) {
+        if ($this->request->request->get('buscar_cliente')) {
             $this->buscar_cliente_json();
-        } else if (filter_input(INPUT_POST, 'action') === 'delete_grupo') {
+        } else if ($this->request->request->get('action') === 'delete_grupo') {
             if ($this->requireMutationCsrf(fn() => $this->load_clientes())) {
                 $this->delete_grupo();
             }
-        } else if (filter_input(INPUT_POST, 'nuevo_grupo')) {
+        } else if ($this->request->request->get('nuevo_grupo')) {
             if ($this->requireMutationCsrf(fn() => $this->load_clientes())) {
                 $this->nuevo_grupo();
             }
-        } else if (filter_input(INPUT_POST, 'codcliente')) {
+        } else if ($this->request->request->get('action') === 'nuevo_cliente') {
             if ($this->requireMutationCsrf(fn() => $this->load_clientes())) {
                 $this->nuevo_cliente();
             }
-        } else if (filter_input(INPUT_POST, 'action') === 'delete') {
+        } else if ($this->request->request->get('action') === 'delete') {
             if ($this->requireMutationCsrf(fn() => $this->load_clientes())) {
                 $this->delete_cliente();
             }
@@ -174,13 +174,15 @@ class ventas_clientes extends clientes_controller
     private function nuevo_cliente()
     {
         $cliente = new cliente();
-        $cliente->codcliente = filter_input(INPUT_POST, 'codcliente') ?: null;
-        $cliente->nombre = filter_input(INPUT_POST, 'nombre') ?? '';
-        $cliente->razonsocial = filter_input(INPUT_POST, 'razonsocial') ?: filter_input(INPUT_POST, 'nombre') ?? '';
-        $cliente->cifnif = filter_input(INPUT_POST, 'cifnif') ?? '';
-        $cliente->telefono1 = filter_input(INPUT_POST, 'telefono1') ?? '';
-        $cliente->email = filter_input(INPUT_POST, 'email') ?? '';
-        $cliente->codgrupo = !empty(filter_input(INPUT_POST, 'codgrupo')) ? filter_input(INPUT_POST, 'codgrupo') : null;
+        $cliente->codcliente = $this->request->request->get('codcliente')
+            ?: $this->request->request->get('codigo')
+            ?: null;
+        $cliente->nombre = $this->request->request->get('nombre') ?? '';
+        $cliente->razonsocial = $this->request->request->get('razonsocial') ?: $this->request->request->get('nombre') ?? '';
+        $cliente->cifnif = $this->request->request->get('cifnif') ?? '';
+        $cliente->telefono1 = $this->request->request->get('telefono1') ?? '';
+        $cliente->email = $this->request->request->get('email') ?? '';
+        $cliente->codgrupo = !empty($this->request->request->get('codgrupo')) ? $this->request->request->get('codgrupo') : null;
 
         if ($cliente->save()) {
             header('Location: ' . $cliente->url());
@@ -204,7 +206,7 @@ class ventas_clientes extends clientes_controller
             return;
         }
 
-        $cod = trim((string) (filter_input(INPUT_POST, 'codcliente') ?? ''));
+        $cod = trim((string) ($this->request->request->get('codcliente') ?? ''));
         if ($cod === '' || !preg_match('/^\d{1,6}$/', $cod)) {
             $this->new_error_msg('Cliente no encontrado.');
             $this->load_clientes();
@@ -230,7 +232,7 @@ class ventas_clientes extends clientes_controller
     {
         $grupo = new grupo_clientes();
         $grupo->codgrupo = $grupo->get_new_codigo();
-        $grupo->nombre = filter_input(INPUT_POST, 'nuevo_grupo') ?? '';
+        $grupo->nombre = $this->request->request->get('nuevo_grupo') ?? '';
 
         if ($grupo->save()) {
             $this->new_message('Grupo guardado correctamente.');
@@ -250,7 +252,7 @@ class ventas_clientes extends clientes_controller
             return;
         }
 
-        $cod = trim((string) (filter_input(INPUT_POST, 'codgrupo') ?? ''));
+        $cod = trim((string) ($this->request->request->get('codgrupo') ?? ''));
         if ($cod === '' || !preg_match('/^\d{1,6}$/', $cod)) {
             $this->new_error_msg('Grupo no encontrado.');
             $this->grupos = (new grupo_clientes())->all();
