@@ -69,7 +69,16 @@ class ventas_clientes extends clientes_controller
         $grupo_model = new grupo_clientes();
         $this->grupos = $grupo_model->all();
 
-        $this->dispatch();
+        $result = $this->dispatch();
+
+        // Preserve the legacy 302 redirect for the production HTTP path.
+        // dispatch() returns redirect_url set by the nuevo_cliente branch; emit
+        // the Location header and exit so the user lands on the new cliente
+        // detail page, matching pre-refactor behavior.
+        if ($result['redirect_url'] !== null) {
+            header('Location: ' . $result['redirect_url']);
+            exit();
+        }
     }
 
     /**
