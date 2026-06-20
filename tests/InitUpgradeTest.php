@@ -177,4 +177,143 @@ class InitUpgradeTest extends TestCase
             'Flag value must remain "1"'
         );
     }
+
+    /**
+     * Case 3 — non-empty table + no flag → no insert, but flag IS set.
+     *
+     * Spec: default-client-on-activation#Scenario:Non-empty install skips the insert and still sets the flag.
+     */
+    public function test_is_noop_when_table_nonempty_and_sets_flag(): void
+    {
+        \FSFramework\model\cliente::$selectResult = [['x' => 1]];
+
+        \FSFramework\Plugins\clientes_core\Init::upgrade();
+
+        $this->assertCount(
+            1,
+            \FSFramework\model\cliente::$instances,
+            'cliente must be instantiated once (to obtain the db handle)'
+        );
+        $this->assertSame(
+            0,
+            \FSFramework\model\cliente::$saveCalls,
+            'save() must NOT be called when the table already has rows'
+        );
+        $this->assertSame(
+            '1',
+            $GLOBALS['config2']['clientes_core_default_seeded'] ?? null,
+            'Flag must be set to "1" so future activations short-circuit'
+        );
+    }
+
+    /**
+     * Case 4 — DB error during save is swallowed.
+     *
+     * Spec: default-client-on-activation#Scenario:DB error during seed does not break activation.
+     */
+    public function test_swallows_db_error_during_save(): void
+    {
+        \FSFramework\model\cliente::$selectResult = [];
+        \FSFramework\model\cliente::$saveException = new \RuntimeException('boom');
+
+        \FSFramework\Plugins\clientes_core\Init::upgrade();
+
+        $this->assertSame(
+            1,
+            \FSFramework\model\cliente::$saveCalls,
+            'save() must be invoked once before the throw'
+        );
+        $this->assertArrayNotHasKey(
+            'clientes_core_default_seeded',
+            $GLOBALS['config2'],
+            'Flag must NOT be set when the save throws (so the next activation retries)'
+        );
+        $this->assertSame(
+            0,
+            \fs_settings::$saveCalls,
+            'fs_settings::save() must NOT be called when the seeder threw'
+        );
+    }
+
+    /**
+     * Case 5 (bonus) — cold start, table does not yet exist.
+     *
+     * On a brand-new install `clientes` does not exist when
+     * `runPluginUpgrade` calls `Init::upgrade()` (runPluginUpgrade
+     * runs before `ensurePluginTables`). The `cliente`
+     * constructor's `parent::__construct('clientes')` calls
+     * `check_table()` which auto-creates the table from the
+     * plugin's XML schema. The seeder then continues to insert
+     * the default row.
+     *
+     * The fake's constructor intentionally skips the parent
+     * `fs_model::__construct('clientes')` to keep the test DB-free;
+     * that is functionally equivalent to the production path once
+     * `check_table()` has succeeded (the `db` handle is available
+     * for subsequent `select()` / `save()` calls either way).
+     */
+    public function test_cold_start_auto_creates_table(): void
+    {
+        \FSFramework\model\cliente::$selectResult = [];
+
+        \FSFramework\Plugins\clientes_core\Init::upgrade();
+
+        $this->assertCount(
+            1,
+            \FSFramework\model\cliente::$instances,
+            'cliente must be instantiated exactly once during cold start'
+        );
+        $this->assertSame(
+            1,
+            \FSFramework\model\cliente::$saveCalls,
+            'save() must run after the constructor exposes the db handle'
+        );
+        $this->assertSame(
+            'Cliente por defecto',
+            \FSFramework\model\cliente::$instances[0]->nombre,
+            'Seeded cliente must have the canonical default name'
+        );
+    }
+
+    /**
+     * Case 6 (bonus) — set and save are called in the right order.
+     *
+     * `fs_settings::set('clientes_core_default_seeded', '1')` must
+     * be called before `fs_settings::save()` (which persists the
+     * whole `config2` array). If `set` ran after `save`, the
+     * persisted file would be missing the flag.
+     */
+    public function test_sets_flag_via_set_and_save(): void
+    {
+        \FSFramework\model\cliente::$selectResult = [];
+
+        \FSFramework\Plugins\clientes_core\Init::upgrade();
+
+        $setIndex = -1;
+        $saveIndex = -1;
+        foreach (\fs_settings::$callLog as $i => $entry) {
+            if ($entry[0] === 'set' && ($entry[1] ?? null) === 'clientes_core_default_seeded') {
+                $setIndex = $i;
+            }
+            if ($entry[0] === 'save') {
+                $saveIndex = $i;
+            }
+        }
+
+        $this->assertGreaterThanOrEqual(
+            0,
+            $setIndex,
+            'fs_settings::set(clientes_core_default_seeded, ...) must be called'
+        );
+        $this->assertGreaterThanOrEqual(
+            0,
+            $saveIndex,
+            'fs_settings::save() must be called'
+        );
+        $this->assertLessThan(
+            $saveIndex,
+            $setIndex,
+            'fs_settings::set(...) must run BEFORE fs_settings::save()'
+        );
+    }
 }

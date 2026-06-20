@@ -23,6 +23,7 @@ require_once __DIR__ . '/src/ViewHookRegistry.php';
 
 use FSFramework\Event\FSEventDispatcher;
 use FSFramework\Event\TwigInitEvent;
+use FSFramework\model\cliente;
 
 /**
  * Initialization class for clientes_core plugin.
@@ -37,6 +38,47 @@ class Init
         $dispatcher->addListener(TwigInitEvent::NAME, function (TwigInitEvent $event) {
             $this->registerTwigExtensions($event->getTwig());
         });
+    }
+
+    /**
+     * Activation hook. Called once per plugin activation by
+     * fs_plugin_manager::runPluginUpgrade (base/fs_plugin_manager.php
+     * around line 643-655). Convention established by the
+     * default-client-on-activation change. Static, idempotent via
+     * fs_settings flag, fail-safe via try/catch.
+     *
+     * Seeds a single "Cliente por defecto" cliente on a fresh
+     * install so downstream sales/invoicing flows always have at
+     * least one valid codcliente to reference. A persistent
+     * clientes_core_default_seeded flag in fs_settings
+     * short-circuits the body on every subsequent activation.
+     *
+     * The body is wrapped in try { ... } catch (\Throwable $e)
+     * so a DB error during the seed never breaks plugin
+     * activation. This is in addition to (not a replacement
+     * for) the framework-level try/catch in runPluginUpgrade.
+     */
+    public static function upgrade(): void
+    {
+        $settings = new \fs_settings();
+        if ($settings->get('clientes_core_default_seeded')) {
+            return;
+        }
+
+        try {
+            $cliente = new cliente();
+            $rows = $cliente->db->select("SELECT 1 FROM clientes LIMIT 1");
+            if (empty($rows)) {
+                $cliente->nombre = 'Cliente por defecto';
+                $cliente->save();
+            }
+
+            $settings->set('clientes_core_default_seeded', '1');
+            $settings->save();
+        } catch (\Throwable $e) {
+            // Swallow: a failed seed must never break plugin activation.
+            // The flag was not set, so the next activation can retry.
+        }
     }
 
     private function registerTwigExtensions(\Twig\Environment $twig): void
