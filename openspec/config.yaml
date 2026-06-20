@@ -1,0 +1,68 @@
+# OpenSpec — plugin clientes_core
+# Initialized: 2026-06-20
+
+project: clientes_core-plugin
+scope: plugins/clientes_core/
+parent_project: fs-framework
+parent_openspec: ../../openspec/   # referencia, NO tracker — no crear cambios aquí
+artifact_store: openspec
+
+# =============================================================================
+# OpenSpec per plugin — esta es la ÚNICA ubicación de SDD para el plugin.
+# =============================================================================
+# Regla arquitectónica del proyecto (ver AGENTS.md → "OpenSpec per plugin"):
+#
+#   - Plugin openspec (este archivo): fuente de verdad para TODO SDD del plugin
+#     (proposal, specs, tasks, verify-report, archive-report).
+#
+#   - Core openspec (../../openspec/): SOLO para cambios que tocan código del
+#     core (base/, src/, controller/, model/ raíz, o convenciones que cruzan
+#     múltiples plugins).
+#
+#   - NO crear entradas en el core openspec para cambios 100% internos al
+#     plugin. Mantiene el core limpio y respeta la autonomía del plugin
+#     (los plugins están gitignored y tienen ciclo de vida propio).
+#
+#   - Criterio rápido: si el change NO toca archivos fuera de plugins/clientes_core/,
+#     todo el SDD vive aquí. Si toca algo del core, abrir el SDD en el core
+#     y referenciar al plugin si es necesario.
+# =============================================================================
+
+ownership: plugin-local
+change_root: plugins/clientes_core/openspec/changes/{name}/
+archive_root: plugins/clientes_core/openspec/changes/archive/{YYYY-MM-DD}-{name}/
+
+context: >
+  Plugin núcleo de terceros para FSFramework. Provee el modelo `cliente`
+  (DB table `clientes`), direcciones de cliente y grupos de clientes.
+  No depende de otros plugins (`require = ""` en fsframework.ini). El
+  modelo se referencia vía global alias `\cliente` (clase declarada en
+  `plugins/clientes_core/model/core/cliente.php` bajo el namespace
+  `FSFramework\model`). El hook de ciclo de vida de activación de
+  plugins es el método estático `Init::upgrade()` invocado por
+  `base/fs_plugin_manager.php::runPluginUpgrade()`; este plugin es el
+  primer adoptante de ese hook, que hasta ahora ningún otro plugin
+  implementaba. Specs de dominio del plugin viven aquí; referenciar
+  openspec/ del core solo cuando el cambio toque servicios o
+  convenciones transversales del framework.
+
+strict_tdd: true
+
+testing:
+  runner: ddev exec php vendor/bin/phpunit
+  plugin_tests: true
+  plugin_phpunit_config: plugins/clientes_core/phpunit.xml
+  plugin_run_command: ddev exec php vendor/bin/phpunit -c plugins/clientes_core/phpunit.xml
+  linter: ddev exec composer phpstan
+
+phase_rules:
+  proposal: require intent, scope, and approach before spec/design
+  spec: use delta specs under changes/<name>/specs/
+  tasks: break into implementation units with dependencies
+  apply: implement tasks; run root PHPUnit for regression
+  verify: grep audit + phpstan + manual smoke checklist
+  archive: >
+    Sync delta into openspec/specs/ (the plugin's specs/) and move the
+    change dir to changes/archive/YYYY-MM-DD-<name>/. The plugin's own
+    archive/, NOT the parent core's archive/. See AGENTS.md
+    "OpenSpec per plugin" for the full convention.
