@@ -246,4 +246,113 @@ class ClienteModelTest extends TestCase
         $this->assertStringNotContainsString('<script>', $this->model->nombre);
         $this->assertStringNotContainsString('<b>', $this->model->cifnif);
     }
+
+    /**
+     * Build a cliente instance wired to a controllable in-memory db stub.
+     *
+     * The anonymous subclass exposes a public $db (assignable from the
+     * test) and an explicit $table_name (also assignable). The stub
+     * captures the SQL string passed to select() and returns whatever
+     * the test sets on $selectResult.
+     *
+     * @param array $selectResult
+     * @return object
+     */
+    private function makeClienteWithStubbedDb(array $selectResult): object
+    {
+        $stub = new class($selectResult) {
+            public string $lastSql = '';
+            public array $selectResult;
+            public int $selectCalls = 0;
+
+            public function __construct(array $selectResult)
+            {
+                $this->selectResult = $selectResult;
+            }
+
+            public function select(string $sql, array $params = [])
+            {
+                $this->lastSql = $sql;
+                $this->selectCalls++;
+                return $this->selectResult;
+            }
+        };
+
+        return new class($stub) extends \FSFramework\model\cliente {
+            public $db;
+            public function __construct(object $dbStub)
+            {
+                $this->db = $dbStub;
+                $this->table_name = 'clientes';
+                $this->nombre = '';
+                $this->razonsocial = '';
+                $this->cifnif = '';
+                $this->regimeniva = 'General';
+                $this->debaja = false;
+                $this->recargo = false;
+                $this->personafisica = true;
+                $this->codcliente = null;
+                $this->fechabaja = null;
+                $this->codgrupo = null;
+                $this->codproveedor = null;
+                $this->observaciones = null;
+                $this->diaspago = null;
+            }
+            public function delete() { return false; }
+            public function exists() { return false; }
+            public function save() { return false; }
+        };
+    }
+
+    /**
+     * table_has_rows() must return true when the clientes table has at
+     * least one row. The test uses a stubbed db that returns a non-empty
+     * array.
+     */
+    public function testTableHasRowsReturnsTrueWhenNonEmpty(): void
+    {
+        $cliente = $this->makeClienteWithStubbedDb([['x' => 1]]);
+
+        $this->assertTrue(
+            $cliente->table_has_rows(),
+            'table_has_rows() must return true when the underlying select returns rows'
+        );
+    }
+
+    /**
+     * table_has_rows() must return false when the clientes table is
+     * empty. The test uses a stubbed db that returns an empty array.
+     */
+    public function testTableHasRowsReturnsFalseWhenEmpty(): void
+    {
+        $cliente = $this->makeClienteWithStubbedDb([]);
+
+        $this->assertFalse(
+            $cliente->table_has_rows(),
+            'table_has_rows() must return false when the underlying select returns no rows'
+        );
+    }
+
+    /**
+     * table_has_rows() must issue a SELECT against the model's table.
+     * The test asserts the captured SQL contains the table name — this
+     * guards against a future refactor that hardcodes a different table.
+     */
+    public function testTableHasRowsQueriesTheClientesTable(): void
+    {
+        $cliente = $this->makeClienteWithStubbedDb([]);
+
+        $cliente->table_has_rows();
+
+        $ref = new \ReflectionProperty(\FSFramework\model\cliente::class, 'db');
+        $ref->setAccessible(true);
+        $stub = $ref->getValue($cliente);
+
+        $this->assertSame(1, $stub->selectCalls, 'table_has_rows() must call db->select() exactly once');
+        $this->assertStringContainsString(
+            'clientes',
+            $stub->lastSql,
+            'table_has_rows() must issue a SELECT that targets the clientes table'
+        );
+    }
 }

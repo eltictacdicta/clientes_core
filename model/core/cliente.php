@@ -280,6 +280,20 @@ class cliente extends \fs_model
     }
 
     /**
+     * Returns true if the clientes table has at least one row, false
+     * otherwise. Used by activation-time seeders that need to know
+     * whether the table is empty without reaching for the protected
+     * $db handle from outside the class.
+     *
+     * @return bool
+     */
+    public function table_has_rows(): bool
+    {
+        $rows = $this->db->select("SELECT 1 FROM " . $this->table_name . " LIMIT 1;");
+        return !empty($rows);
+    }
+
+    /**
      * Devuelve un array con los regimenes de iva disponibles.
      * @return array
      */

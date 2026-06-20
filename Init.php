@@ -67,8 +67,7 @@ class Init
 
         try {
             $cliente = new cliente();
-            $rows = $cliente->db->select("SELECT 1 FROM clientes LIMIT 1");
-            if (empty($rows)) {
+            if (!$cliente->table_has_rows()) {
                 $cliente->nombre = 'Cliente por defecto';
                 $cliente->save();
             }

@@ -51,14 +51,28 @@ namespace FSFramework\model {
      * resetStatic() method. Instances are tracked via $instances
      * so the test can assert how many veces the seeder
      * instantiated the model.
+     *
+     * The fake's $table_has_rows_result public static controls the
+     * return value of table_has_rows() (the production method added
+     * by the CRITICAL-1 fix in the default-client-on-activation
+     * change). Each test sets it explicitly in setUp() so the
+     * seeder's "empty table" / "non-empty table" branches are
+     * controllable without touching the protected $db handle.
      */
     class cliente extends \fs_model
     {
         /** @var self[] Every constructor call pushes the new instance here. */
         public static array $instances = [];
 
-        /** Stub for $this->db->select() to return. */
-        public static array $selectResult = [];
+        /**
+         * Stub return value for table_has_rows(). When null, falls
+         * back to a sensible default (true if the test set
+         * table_has_rows_was_called; otherwise false).
+         */
+        public static ?bool $table_has_rows_result = null;
+
+        /** Number of times table_has_rows() was invoked. */
+        public static int $table_has_rows_calls = 0;
 
         /** Number of times save() has been invoked. */
         public static int $saveCalls = 0;
@@ -66,10 +80,7 @@ namespace FSFramework\model {
         /** If set, save() throws this on first call. */
         public static ?\Throwable $saveException = null;
 
-        /** Number of times the db->select() stub was invoked. */
-        public static int $selectCalls = 0;
-
-        /** @var object The stub db handle. */
+        /** @var object The stub db handle (kept for backward compat). */
         public $db;
 
         public function __construct()
@@ -81,10 +92,22 @@ namespace FSFramework\model {
             $this->db = new class {
                 public function select(string $sql, array $params = []): array
                 {
-                    cliente::$selectCalls++;
-                    return cliente::$selectResult;
+                    return [];
                 }
             };
+        }
+
+        /**
+         * Mirrors the production cliente::table_has_rows() method
+         * (added by the CRITICAL-1 fix in
+         * plugins/clientes_core/model/core/cliente.php). The test
+         * sets $table_has_rows_result in setUp() to control the
+         * branch the seeder takes.
+         */
+        public function table_has_rows(): bool
+        {
+            self::$table_has_rows_calls++;
+            return self::$table_has_rows_result ?? false;
         }
 
         public function save(): bool
@@ -109,10 +132,10 @@ namespace FSFramework\model {
         public static function resetStatic(): void
         {
             self::$instances = [];
-            self::$selectResult = [];
+            self::$table_has_rows_result = null;
+            self::$table_has_rows_calls = 0;
             self::$saveCalls = 0;
             self::$saveException = null;
-            self::$selectCalls = 0;
         }
     }
 }

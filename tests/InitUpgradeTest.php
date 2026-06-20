@@ -52,8 +52,9 @@ use PHPUnit\Framework\TestCase;
  *      `fs_settings`, loads the in-memory fakes from
  *      `tests/Fixtures/InitUpgradeFakes.php`. The fakes mirror
  *      the production API surface that the seeder consumes
- *      (cliente::save, fs_settings::get/set/save) and expose
- *      static counters/logs the assertions read.
+ *      (cliente::table_has_rows, cliente::save,
+ *      fs_settings::get/set/save) and expose static
+ *      counters/logs the assertions read.
  *
  *   3. The fakes use the same FQCN as the production classes.
  *      The autoloader loads them only when the class is first
@@ -119,7 +120,7 @@ class InitUpgradeTest extends TestCase
      */
     public function test_seeds_default_client_when_table_empty_and_flag_unset(): void
     {
-        \FSFramework\model\cliente::$selectResult = [];
+        \FSFramework\model\cliente::$table_has_rows_result = false;
 
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 
@@ -148,6 +149,11 @@ class InitUpgradeTest extends TestCase
             \fs_settings::$saveCalls,
             'fs_settings::save() must be called once after writing the flag'
         );
+        $this->assertSame(
+            1,
+            \FSFramework\model\cliente::$table_has_rows_calls,
+            'table_has_rows() must be called exactly once to detect the empty table'
+        );
     }
 
     /**
@@ -168,8 +174,8 @@ class InitUpgradeTest extends TestCase
         );
         $this->assertSame(
             0,
-            \FSFramework\model\cliente::$selectCalls,
-            'No DB query must be issued when the flag short-circuits'
+            \FSFramework\model\cliente::$table_has_rows_calls,
+            'No table_has_rows() call must be issued when the flag short-circuits'
         );
         $this->assertSame(
             '1',
@@ -185,14 +191,14 @@ class InitUpgradeTest extends TestCase
      */
     public function test_is_noop_when_table_nonempty_and_sets_flag(): void
     {
-        \FSFramework\model\cliente::$selectResult = [['x' => 1]];
+        \FSFramework\model\cliente::$table_has_rows_result = true;
 
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 
         $this->assertCount(
             1,
             \FSFramework\model\cliente::$instances,
-            'cliente must be instantiated once (to obtain the db handle)'
+            'cliente must be instantiated once (to call table_has_rows())'
         );
         $this->assertSame(
             0,
@@ -213,7 +219,7 @@ class InitUpgradeTest extends TestCase
      */
     public function test_swallows_db_error_during_save(): void
     {
-        \FSFramework\model\cliente::$selectResult = [];
+        \FSFramework\model\cliente::$table_has_rows_result = false;
         \FSFramework\model\cliente::$saveException = new \RuntimeException('boom');
 
         \FSFramework\Plugins\clientes_core\Init::upgrade();
@@ -249,12 +255,11 @@ class InitUpgradeTest extends TestCase
      * The fake's constructor intentionally skips the parent
      * `fs_model::__construct('clientes')` to keep the test DB-free;
      * that is functionally equivalent to the production path once
-     * `check_table()` has succeeded (the `db` handle is available
-     * for subsequent `select()` / `save()` calls either way).
+     * `check_table()` has succeeded.
      */
     public function test_cold_start_auto_creates_table(): void
     {
-        \FSFramework\model\cliente::$selectResult = [];
+        \FSFramework\model\cliente::$table_has_rows_result = false;
 
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 
@@ -266,7 +271,7 @@ class InitUpgradeTest extends TestCase
         $this->assertSame(
             1,
             \FSFramework\model\cliente::$saveCalls,
-            'save() must run after the constructor exposes the db handle'
+            'save() must run after table_has_rows() reports an empty table'
         );
         $this->assertSame(
             'Cliente por defecto',
@@ -285,7 +290,7 @@ class InitUpgradeTest extends TestCase
      */
     public function test_sets_flag_via_set_and_save(): void
     {
-        \FSFramework\model\cliente::$selectResult = [];
+        \FSFramework\model\cliente::$table_has_rows_result = false;
 
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 

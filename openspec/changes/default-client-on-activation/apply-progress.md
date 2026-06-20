@@ -116,6 +116,200 @@ commits, this change is split into **3 atomic commits**:
 | 2 | _pending_ | `feat(clientes_core): seed default cliente on activation via Init::upgrade()` |
 | 3 | _pending_ | `chore(clientes_core): bump plugin version to 2` |
 
+## Pass 2 — CRITICAL-1 fix (2026-06-20)
+
+> **Origin**: `verify-report.md` → CRITICAL-1 (protected `$db` access
+> from `Init::upgrade()` line 70). Original 3 apply commits
+> (`c5bc4b6e`, `3133ba34`, `749823a8`) remain. This pass adds a new
+> fix commit on top.
+>
+> **Chosen fix (J1 — clean architecture)**: add a public method
+> `cliente::table_has_rows(): bool` to the model; refactor
+> `Init::upgrade()` to call that method instead of reaching for
+> `$cliente->db` directly.
+
+### Commit strategy decision
+
+A single atomic commit is chosen for the fix:
+
+> `fix(clientes_core): use public cliente::table_has_rows() to fix protected $db access`
+
+Rationale (per `work-unit-commits` skill):
+
+- One clear purpose: "stop reaching for protected $db from outside
+  the class". The repo still makes sense after applying only this
+  commit (the seeder works, the new test passes, the fake matches,
+  the SDD is consistent).
+- The new public method and its test are co-introduced in the same
+  commit (RED → GREEN for the new test, GREEN for the existing 6
+  `InitUpgradeTest` cases after the refactor).
+- The fake update, the Init.php refactor, and the SDD artifact
+  updates are tightly coupled: any subset leaves the repo in an
+  inconsistent state (e.g. Init.php calls a method the fake does not
+  have, or the spec mandates behaviour the code does not implement).
+- Estimated diff: ≈ 130 lines (≈ 13 prod + ≈ 25 new tests + ≈ 50
+  fake refactor + ≈ 42 SDD docs), well under the 400-line review
+  budget.
+
+### T7.A — Add `cliente::table_has_rows()` to the model (RED → GREEN)
+
+- **Files modified**:
+  - `plugins/clientes_core/model/core/cliente.php` — added public
+    `table_has_rows(): bool` method (10 lines including docblock).
+- **Verification command (RED — before model change)**:
+  ```
+  ddev exec php vendor/bin/phpunit -c plugins/clientes_core/phpunit.xml --filter TableHasRows
+  ```
+- **Result (RED)**: `Tests: 3, Assertions: 0, Errors: 3`. All three
+  new tests fail with
+  `Error: Call to undefined method FSFramework\model\cliente@anonymous::table_has_rows()`.
+  RED confirmed ✅.
+- **Verification command (GREEN — after model change)**:
+  ```
+  ddev exec php vendor/bin/phpunit -c plugins/clientes_core/phpunit.xml --filter TableHasRows
+  ```
+- **Result (GREEN)**: `Tests: 3, Assertions: 4, PHPUnit Deprecations: 1`.
+  All three new tests pass. GREEN confirmed ✅.
+
+### T7.B — Unit test for `cliente::table_has_rows()` (already in T7.A RED)
+
+The three new test methods added to
+`plugins/clientes_core/tests/ClienteModelTest.php`:
+
+- `testTableHasRowsReturnsTrueWhenNonEmpty`
+- `testTableHasRowsReturnsFalseWhenEmpty`
+- `testTableHasRowsQueriesTheClientesTable`
+
+Each exercises one branch of the method (returns `true` on
+non-empty, returns `false` on empty, captures the SQL to confirm it
+targets `$this->table_name`). The fourth assertion (4 across 3
+tests) covers the SQL contract — guards against a future refactor
+that hardcodes a different table.
+
+### T7.C — Refactor `Init::upgrade()` to use the new method
+
+- **Files modified**:
+  - `plugins/clientes_core/Init.php` — replaced
+    `$rows = $cliente->db->select("SELECT 1 FROM clientes LIMIT 1");
+    if (empty($rows)) { ... }` with
+    `if (!$cliente->table_has_rows()) { ... }`. The docblock and
+    the `try/catch` are unchanged. The now-unused `$rows` variable
+    is gone.
+- **Verification command**:
+  ```
+  ddev exec php vendor/bin/phpunit -c plugins/clientes_core/phpunit.xml
+  ```
+- **Result**: `Tests: 41, Assertions: 95, PHPUnit Deprecations: 7` —
+  all pass. (38 pre-existing + 3 new in `ClienteModelTest` for
+  `table_has_rows()`; the refactor did not break the existing 6
+  `InitUpgradeTest` cases because the fake now exposes a public
+  `table_has_rows()` too — see T7.D.)
+- GREEN confirmed ✅.
+
+### T7.D — Update the test fake and the existing 6 InitUpgradeTest cases
+
+- **Files modified**:
+  - `plugins/clientes_core/tests/Fixtures/InitUpgradeFakes.php` —
+    removed the inline `$db` stub's `select()`-return seam (the
+    fake's db stub now just returns `[]`); added
+    `public static ?bool $table_has_rows_result`,
+    `public static int $table_has_rows_calls`, and a public
+    `table_has_rows(): bool` method on the fake that increments
+    the counter and returns the configured value. Updated
+    `resetStatic()` to clear the new state.
+  - `plugins/clientes_core/tests/InitUpgradeTest.php` — replaced
+    the old `\FSFramework\model\cliente::$selectResult` / `$selectCalls`
+    usage with `\FSFramework\model\cliente::$table_has_rows_result` /
+    `$table_has_rows_calls` across all 6 cases. Updated the
+    docblock to reflect the new seam.
+- **Verification command**:
+  ```
+  ddev exec php vendor/bin/phpunit -c plugins/clientes_core/phpunit.xml
+  ```
+- **Result**: `Tests: 41, Assertions: 95, PHPUnit Deprecations: 7` —
+  all pass. The 6 `InitUpgradeTest` cases still pass with the new
+  fake API; the 32 pre-existing tests still pass; the 3 new
+  `ClienteModelTest` tests still pass. GREEN confirmed ✅.
+
+### T7.E — Update the SDD artifacts
+
+- **Files modified**:
+  - `plugins/clientes_core/openspec/changes/default-client-on-activation/specs/clientes/spec.md` —
+    replaced the SQL-string SHALL with the new
+    `table_has_rows()`-method SHALL; added a new SHALL mandating
+    that the `cliente` model expose the public method; added two
+    new Scenarios ("Seeder uses the public `table_has_rows()` API"
+    and "`cliente::table_has_rows()` is public and table-portable").
+  - `plugins/clientes_core/openspec/changes/default-client-on-activation/design.md` —
+    updated the `cliente` model API table (added the new method
+    row), replaced the "Counting rows" subsection to describe the
+    public method, updated the implementation sketch to use
+    `$cliente->table_has_rows()`, and added Risk #11
+    ("Method visibility regression" + mitigation = unit test
+    canary).
+  - `plugins/clientes_core/openspec/changes/default-client-on-activation/tasks.md` —
+    added the T7 entry at the end with the six sub-tasks
+    (T7.A, T7.B, T7.C, T7.D, T7.E, T7.F) and the spec references.
+  - `plugins/clientes_core/openspec/changes/default-client-on-activation/apply-progress.md` —
+    this section.
+
+### T7.F — Re-run the automated test suites
+
+| Command | Exit | Result |
+|---------|------|--------|
+| `ddev exec php vendor/bin/phpunit -c plugins/clientes_core/phpunit.xml` | 0 | `Tests: 41, Assertions: 95, PHPUnit Deprecations: 7` (all pass; 32 pre-existing + 3 new in `ClienteModelTest` + 6 in `InitUpgradeTest`) |
+| `ddev exec php vendor/bin/phpunit --testsuite Plugins` | 1 | `Tests: 292, Assertions: 594, Failures: 1, Skipped: 1`. The single failure is the pre-existing `CsrfTokenTest::expiredTokenIsRejected` in `plugins/system_updater/` — NOT a regression from this fix (zero files under `plugins/system_updater/` were touched by the fix; the failure was present before T7 and is documented in `verify-report.md` §"Pre-existing out-of-scope observations"). |
+| `ddev exec php vendor/bin/phpunit` (full root) | 1 | `Tests: 717, Assertions: 1596, Failures: 1, Skipped: 14`. Same single pre-existing CSRF failure. **No new regressions.** |
+
+### Live smokes
+
+NOT re-run in this apply pass — that is the next phase
+(`sdd-verify`) per the orchestrator's explicit instruction
+("`H. Do NOT re-run the live smoke checks`"). The next phase
+must re-run Smoke #1, #2, #3, #4 on the ddev DB to confirm
+that the seeder now actually inserts the row and persists the
+flag (the pre-fix smokes failed at lines 70 of `Init.php`;
+post-fix, the new method `table_has_rows()` does the SELECT
+through the model's protected `$db` legally, so the seeder
+should reach the `$cliente->save()` and `$settings->set()` /
+`save()` calls as designed).
+
+### Files changed in Pass 2
+
+| Path | Action | T7 sub-task |
+|------|--------|------------|
+| `plugins/clientes_core/model/core/cliente.php` | modified (new public method + docblock) | T7.A |
+| `plugins/clientes_core/tests/ClienteModelTest.php` | modified (3 new test methods + helper) | T7.B |
+| `plugins/clientes_core/Init.php` | modified (refactor of `upgrade()` body) | T7.C |
+| `plugins/clientes_core/tests/Fixtures/InitUpgradeFakes.php` | modified (new public `table_has_rows()` + state) | T7.D |
+| `plugins/clientes_core/tests/InitUpgradeTest.php` | modified (use new fake API across 6 cases) | T7.D |
+| `plugins/clientes_core/openspec/changes/default-client-on-activation/specs/clientes/spec.md` | modified (new SHALLs + 2 new Scenarios) | T7.E |
+| `plugins/clientes_core/openspec/changes/default-client-on-activation/design.md` | modified (API table, sketch, Risks) | T7.E |
+| `plugins/clientes_core/openspec/changes/default-client-on-activation/tasks.md` | modified (T7 entry) | T7.E |
+| `plugins/clientes_core/openspec/changes/default-client-on-activation/apply-progress.md` | modified (this section) | T7.E |
+
+### Pre-existing failures observed in T7.F
+
+| Test | File | Status |
+|---|---|---|
+| `CsrfTokenTest::expiredTokenIsRejected` | `plugins/system_updater/tests/CsrfTokenTest.php:83` | Pre-existing, out-of-scope, NOT a regression introduced by T7. Same failure as in `apply-progress.md` §T5 and `verify-report.md` §"Pre-existing out-of-scope observations". |
+
+### Notes for the next phase (sdd-verify)
+
+- **Re-run the four live smoke checks** (Smoke #1 cold start,
+  Smoke #2 re-activation no-op, Smoke #3 non-empty install, Smoke
+  #4 DB error during seed). All four should now PASS — the
+  post-fix seeder calls `$cliente->table_has_rows()` which is
+  legal from outside the class, so the seeder reaches the
+  `$cliente->save()` and `$settings->set()` / `save()` calls as
+  designed.
+- The unit test for `cliente::table_has_rows()` is the new
+  visibility-regression canary. If a future refactor removes
+  the public method or makes it `protected`, the 3 tests in
+  `ClienteModelTest` will fail. CI must remain green.
+- The `CsrfTokenTest::expiredTokenIsRejected` failure in
+  `plugins/system_updater/` remains pre-existing and unrelated.
+
 ## Files changed
 
 | Path | Action |
