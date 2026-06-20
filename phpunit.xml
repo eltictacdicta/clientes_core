@@ -4,6 +4,8 @@
          bootstrap="../../tests/bootstrap.php"
          colors="true"
          cacheDirectory="../../.phpunit.cache"
+         processIsolation="true"
+         stopOnFailure="false"
 >
     <testsuites>
         <testsuite name="clientes_core">
