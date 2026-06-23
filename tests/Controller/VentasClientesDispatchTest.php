@@ -17,16 +17,28 @@
  * Maps 1:1 to scenarios in spec.md (VCT-01.a..e). VCT-01.f requires
  * a strict-format stub that PHP cannot swap mid-process; documented
  * as a follow-up in the verify report.
+ *
+ * Process isolation: root phpunit.xml runs the Plugins suite without
+ * processIsolation, so sibling tests like
+ * Tests\OidcProvider\Service\ClienteRoleResolverIntegrationTest that
+ * `require_once 'plugins/clientes_core/model/cliente.php'` in their
+ * setUp would leave the real `cliente` class loaded and defeat the
+ * stub autoloader below — PHP does not allow redeclaring a class.
+ * Same pattern used by InitUpgradeTest (see its class-level docblock).
  */
 
 declare(strict_types=1);
 
 namespace Tests\ClientesCore\Controller;
 
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 use FSFramework\Security\CsrfManager;
 
+#[RunTestsInSeparateProcesses]
+#[PreserveGlobalState(false)]
 final class VentasClientesDispatchTest extends TestCase
 {
     /** @var object */
