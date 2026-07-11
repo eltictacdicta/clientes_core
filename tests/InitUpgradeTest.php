@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * This file is part of FSFramework originally based on Facturascript 2017
  * Copyright (C) 2025 Javier Trujillo <mistertekcom@gmail.com>
