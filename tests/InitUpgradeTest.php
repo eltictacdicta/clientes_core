@@ -92,6 +92,7 @@ class InitUpgradeTest extends TestCase
 
         // Reset the fakes' static observation counters / logs.
         \FSFramework\model\cliente::resetStatic();
+        \FSFramework\model\grupo_clientes::resetStatic();
         \fs_settings::resetStatic();
     }
 
@@ -105,7 +106,9 @@ class InitUpgradeTest extends TestCase
             if (class_exists($class, false)) {
                 return true;
             }
-            if ($class === 'FSFramework\\model\\cliente' || $class === 'fs_settings') {
+            if ($class === 'FSFramework\\model\\cliente'
+                || $class === 'FSFramework\\model\\grupo_clientes'
+                || $class === 'fs_settings') {
                 require_once __DIR__ . '/Fixtures/InitUpgradeFakes.php';
                 return class_exists($class, false);
             }
@@ -132,9 +135,9 @@ class InitUpgradeTest extends TestCase
             'save() must be called exactly once when the table is empty'
         );
         $this->assertCount(
-            1,
+            2,
             \FSFramework\model\cliente::$instances,
-            'cliente must be instantiated exactly once'
+            'cliente must be instantiated for the seeder and the orphan migration'
         );
         $this->assertSame(
             'Cliente por defecto',
@@ -147,9 +150,9 @@ class InitUpgradeTest extends TestCase
             'Flag must be set to the string "1"'
         );
         $this->assertSame(
-            1,
+            2,
             \fs_settings::$saveCalls,
-            'fs_settings::save() must be called once after writing the flag'
+            'fs_settings::save() must be called for the default seed flag and the discount migration flag'
         );
         $this->assertSame(
             1,
@@ -166,6 +169,7 @@ class InitUpgradeTest extends TestCase
     public function test_is_noop_when_flag_already_set(): void
     {
         $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
+        $GLOBALS['config2']['clientes_core_discounts_migrated'] = '1';
 
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 
@@ -198,9 +202,9 @@ class InitUpgradeTest extends TestCase
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 
         $this->assertCount(
-            1,
+            2,
             \FSFramework\model\cliente::$instances,
-            'cliente must be instantiated once (to call table_has_rows())'
+            'cliente must be instantiated for table_has_rows() and orphan migration'
         );
         $this->assertSame(
             0,
@@ -234,12 +238,17 @@ class InitUpgradeTest extends TestCase
         $this->assertArrayNotHasKey(
             'clientes_core_default_seeded',
             $GLOBALS['config2'],
-            'Flag must NOT be set when the save throws (so the next activation retries)'
+            'Default seed flag must NOT be set when the save throws (so the next activation retries)'
         );
         $this->assertSame(
-            0,
+            1,
             \fs_settings::$saveCalls,
-            'fs_settings::save() must NOT be called when the seeder threw'
+            'fs_settings::save() must still run for the discount migration when the seeder failed'
+        );
+        $this->assertSame(
+            '1',
+            $GLOBALS['config2']['clientes_core_discounts_migrated'] ?? null,
+            'Discount migration flag must be set even when the default seed save throws'
         );
     }
 
@@ -266,9 +275,9 @@ class InitUpgradeTest extends TestCase
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 
         $this->assertCount(
-            1,
+            2,
             \FSFramework\model\cliente::$instances,
-            'cliente must be instantiated exactly once during cold start'
+            'cliente must be instantiated for the seeder and orphan migration during cold start'
         );
         $this->assertSame(
             1,
@@ -321,6 +330,61 @@ class InitUpgradeTest extends TestCase
             $saveIndex,
             $setIndex,
             'fs_settings::set(...) must run BEFORE fs_settings::save()'
+        );
+    }
+
+    public function test_migrates_discounts_and_assigns_orphan_clients(): void
+    {
+        \FSFramework\model\cliente::$table_has_rows_result = true;
+        $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
+
+        \FSFramework\Plugins\clientes_core\Init::upgrade();
+
+        $this->assertSame(
+            1,
+            \FSFramework\model\grupo_clientes::$saveCalls,
+            'Personalizado group must be created once'
+        );
+        $this->assertArrayHasKey(
+            '000000',
+            \FSFramework\model\grupo_clientes::$storedGroups ?? [],
+            'Personalizado group must be stored with code 000000'
+        );
+        $personalizado = \FSFramework\model\grupo_clientes::$storedGroups['000000'];
+        $this->assertSame('Personalizado', $personalizado['nombre']);
+        $this->assertSame(
+            1,
+            \FSFramework\model\cliente::$assignOrphanCalls,
+            'Orphan clients must be assigned to Personalizado'
+        );
+        $this->assertSame(
+            '000000',
+            \FSFramework\model\cliente::$assignOrphanCodgrupo,
+            'Orphan migration must target group 000000'
+        );
+        $this->assertSame(
+            '1',
+            $GLOBALS['config2']['clientes_core_discounts_migrated'] ?? null,
+            'Discount migration flag must be set'
+        );
+    }
+
+    public function test_discount_migration_is_noop_when_flag_already_set(): void
+    {
+        $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
+        $GLOBALS['config2']['clientes_core_discounts_migrated'] = '1';
+
+        \FSFramework\Plugins\clientes_core\Init::upgrade();
+
+        $this->assertSame(
+            0,
+            \FSFramework\model\grupo_clientes::$saveCalls,
+            'No group must be created when discount migration flag is set'
+        );
+        $this->assertSame(
+            0,
+            \FSFramework\model\cliente::$assignOrphanCalls,
+            'No orphan migration must run when discount migration flag is set'
         );
     }
 }

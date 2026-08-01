@@ -111,7 +111,6 @@ class ventas_clientes extends clientes_controller
 
         $action = $this->request->request->get('action');
         $buscarCliente = $this->request->request->get('buscar_cliente');
-        $nuevoGrupo = $this->request->request->get('nuevo_grupo');
 
         if ($buscarCliente) {
             $result['action'] = 'buscar';
@@ -121,7 +120,7 @@ class ventas_clientes extends clientes_controller
             if ($this->requireMutationCsrf(fn() => $this->load_clientes())) {
                 $this->delete_grupo();
             }
-        } elseif ($nuevoGrupo) {
+        } elseif ($action === 'nuevo_grupo') {
             $result['action'] = 'nuevo_grupo';
             if ($this->requireMutationCsrf(fn() => $this->load_clientes())) {
                 $this->nuevo_grupo();
@@ -308,7 +307,10 @@ class ventas_clientes extends clientes_controller
     {
         $grupo = new grupo_clientes();
         $grupo->codgrupo = $grupo->get_new_codigo();
-        $grupo->nombre = $this->request->request->get('nuevo_grupo') ?? '';
+        $grupo->nombre = $this->request->request->get('nombre_grupo') ?? '';
+        $grupo->codtarifa = !empty($this->request->request->get('codtarifa'))
+            ? $this->request->request->get('codtarifa')
+            : null;
 
         if ($grupo->save()) {
             $this->new_message('Grupo guardado correctamente.');

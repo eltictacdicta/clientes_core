@@ -1,0 +1,133 @@
+{#
+/**
+ * Gestión de grupos de descuentos (D1-D4).
+ * Plugin: clientes_core
+ * Twig nativo (no depende de legacy_support).
+ */
+#}
+
+{{ include('header.html.twig') }}
+
+<div class="container-fluid" style="margin-bottom: 10px;">
+    <div class="row">
+        <div class="col-sm-4">
+            <span class="btn-group">
+                <a class="btn btn-sm btn-default" href="{{ fsc.url() }}" title="Recargar">
+                    <i class="fa fa-refresh" aria-hidden="true"></i>
+                </a>
+            </span>
+        </div>
+        <div class="col-sm-8 text-right">
+            <span class="h2">{{ trans('grupos-descuentos') }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-sm-8">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>{{ trans('codigo-grupo') }}</th>
+                            <th>{{ trans('nombre-grupo') }}</th>
+                            <th class="text-center">{{ trans('descuento-d1') }} (%)</th>
+                            <th class="text-center">{{ trans('descuento-d2') }} (%)</th>
+                            <th class="text-center">{{ trans('descuento-d3') }} (%)</th>
+                            <th class="text-center">{{ trans('descuento-d4') }} (%)</th>
+                            <th class="text-right"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for g in fsc.grupos_descuentos %}
+                        <tr>
+                            <td><a href="{{ g.url() }}">{{ g.codgrupo_descuento }}</a></td>
+                            <td><a href="{{ g.url() }}">{{ g.nombre }}</a></td>
+                            <td class="text-center">{{ g.d1 ?? 0 }}</td>
+                            <td class="text-center">{{ g.d2 ?? 0 }}</td>
+                            <td class="text-center">{{ g.d3 ?? 0 }}</td>
+                            <td class="text-center">{{ g.d4 ?? 0 }}</td>
+                            <td class="text-right">
+                                <a href="{{ g.url() }}" class="btn btn-xs btn-default">
+                                    <i class="fa fa-pencil"></i>
+                                </a>
+                                {% if fsc.allow_delete %}
+                                <form method="post" style="display:inline;" onsubmit="return confirm('{{ trans('confirmar-eliminar') }}');">
+                                    {{ csrf_field() }}
+                                    <input type="hidden" name="action" value="delete" />
+                                    <input type="hidden" name="codgrupo_descuento" value="{{ g.codgrupo_descuento }}" />
+                                    <button type="submit" class="btn btn-xs btn-danger">
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr class="warning">
+                            <td colspan="7" class="text-center">{{ trans('sin-resultados') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <h3 class="panel-title"><i class="fa fa-plus"></i> {{ trans('nuevo-grupo-descuentos') }}</h3>
+                </div>
+                <div class="panel-body">
+                    <form action="{{ fsc.url() }}" method="post">
+                        {{ csrf_field() }}
+                        <input type="hidden" name="action" value="nuevo_grupo" />
+                        <div class="form-group">
+                            <label>{{ trans('nombre-grupo') }} *</label>
+                            <input type="text" name="nombre_grupo" class="form-control"
+                                maxlength="100" required />
+                        </div>
+                        <hr/>
+                        <div class="row">
+                            <div class="col-xs-6">
+                                <div class="form-group">
+                                    <label>D1 (%)</label>
+                                    <input type="number" name="d1" value="0" class="form-control"
+                                        min="0" max="100" step="0.01" />
+                                </div>
+                            </div>
+                            <div class="col-xs-6">
+                                <div class="form-group">
+                                    <label>D2 (%)</label>
+                                    <input type="number" name="d2" value="0" class="form-control"
+                                        min="0" max="100" step="0.01" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-xs-6">
+                                <div class="form-group">
+                                    <label>D3 (%)</label>
+                                    <input type="number" name="d3" value="0" class="form-control"
+                                        min="0" max="100" step="0.01" />
+                                </div>
+                            </div>
+                            <div class="col-xs-6">
+                                <div class="form-group">
+                                    <label>D4 (%)</label>
+                                    <input type="number" name="d4" value="0" class="form-control"
+                                        min="0" max="100" step="0.01" />
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-sm btn-success btn-block" type="submit">
+                            <i class="fa fa-floppy-o"></i> {{ trans('guardar') }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ include('footer.html.twig') }}

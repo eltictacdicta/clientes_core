@@ -19,11 +19,11 @@
 
 namespace FSFramework\Plugins\clientes_core;
 
-require_once __DIR__ . '/src/ViewHookRegistry.php';
-
 use FSFramework\Event\FSEventDispatcher;
 use FSFramework\Event\TwigInitEvent;
 use FSFramework\model\cliente;
+use FSFramework\model\grupo_descuentos;
+use FSFramework\View\ViewHookRegistry;
 
 /**
  * Initialization class for clientes_core plugin.
@@ -61,22 +61,52 @@ class Init
     public static function upgrade(): void
     {
         $settings = new \fs_settings();
-        if ($settings->get('clientes_core_default_seeded')) {
+
+        // Invalidate schema check cache so check_table() re-runs and detects
+        // new/changed columns from XML (e.g. codgrupo_descuento on clientes).
+        $cache = new \fs_cache();
+        $cache->delete('fs_checked_tables');
+
+        if (!$settings->get('clientes_core_default_seeded')) {
+            try {
+                $cliente = new cliente();
+                if (!$cliente->table_has_rows()) {
+                    $cliente->nombre = 'Cliente por defecto';
+                    $cliente->save();
+                }
+
+                $settings->set('clientes_core_default_seeded', '1');
+                $settings->save();
+            } catch (\Throwable $e) {
+                error_log('[clientes_core] Default seed failed: ' . $e->getMessage());
+                // A failed seed must never break plugin activation.
+                // The flag was not set, so the next activation can retry.
+            }
+        }
+
+        // Legacy migration (v1 → v2): moved from grupo_clientes to grupo_descuentos.
+        // Only runs once via the flag; safe to leave as a no-op for new installs.
+        if ($settings->get('clientes_core_discounts_migrated')) {
             return;
         }
 
         try {
-            $cliente = new cliente();
-            if (!$cliente->table_has_rows()) {
-                $cliente->nombre = 'Cliente por defecto';
-                $cliente->save();
+            $grupoDescModel = new grupo_descuentos();
+            if (!$grupoDescModel->get('000000')) {
+                $grupoDesc = new grupo_descuentos();
+                $grupoDesc->codgrupo_descuento = '000000';
+                $grupoDesc->nombre = 'Personalizado';
+                $grupoDesc->save();
             }
 
-            $settings->set('clientes_core_default_seeded', '1');
+            $cliente = new cliente();
+            $cliente->assignOrphanClientsToGroup('000000');
+
+            $settings->set('clientes_core_discounts_migrated', '1');
             $settings->save();
         } catch (\Throwable $e) {
-            // Swallow: a failed seed must never break plugin activation.
-            // The flag was not set, so the next activation can retry.
+            error_log('[clientes_core] Discount migration failed: ' . $e->getMessage());
+            // A failed migration must never break plugin activation.
         }
     }
 

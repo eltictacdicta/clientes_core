@@ -201,7 +201,80 @@
                     </div>
                 </div>
 
-                {{ clientes_render_hook('cliente_form_after_main', {'fsc': fsc, 'cliente': cliente})|raw }}
+                {{ render_hook('cliente_form_after_main', {'fsc': fsc, 'cliente': cliente})|raw }}
+
+                {# Descuentos del cliente #}
+                <div class="panel panel-info" style="margin-top: 15px;">
+                    <div class="panel-heading">
+                        <h4 class="panel-title">
+                            <i class="fa fa-percent"></i> {{ trans('descuentos') }}
+                            {% if cliente.codgrupo_descuento %}
+                                {% for gd in fsc.grupos_descuentos %}
+                                    {% if gd.codgrupo_descuento == cliente.codgrupo_descuento %}
+                                        — {{ gd.nombre }}
+                                        {% if cliente.descuentos_modified %}
+                                            <span class="label label-warning">{{ trans('modificado') }}</span>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        </h4>
+                    </div>
+                    <div class="panel-body">
+                        <div class="row">
+                            <div class="col-sm-3">
+                                <div class="form-group">
+                                    <label>{{ trans('grupo-descuentos') }}</label>
+                                    <select name="codgrupo_descuento" class="form-control">
+                                        <option value="">{{ trans('sin-grupo-descuentos') }}</option>
+                                        {% for gd in fsc.grupos_descuentos %}
+                                        <option value="{{ gd.codgrupo_descuento }}"{% if cliente.codgrupo_descuento == gd.codgrupo_descuento %} selected{% endif %}>
+                                            {{ gd.nombre }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-sm-2">
+                                <div class="form-group">
+                                    <label>D1 (%)</label>
+                                    <input type="number" name="d1" value="{{ cliente.d1 ?? 0 }}" class="form-control"
+                                        step="0.01" min="0" max="100" />
+                                </div>
+                            </div>
+                            <div class="col-sm-2">
+                                <div class="form-group">
+                                    <label>D2 (%)</label>
+                                    <input type="number" name="d2" value="{{ cliente.d2 ?? 0 }}" class="form-control"
+                                        step="0.01" min="0" max="100" />
+                                </div>
+                            </div>
+                            <div class="col-sm-2">
+                                <div class="form-group">
+                                    <label>D3 (%)</label>
+                                    <input type="number" name="d3" value="{{ cliente.d3 ?? 0 }}" class="form-control"
+                                        step="0.01" min="0" max="100" />
+                                </div>
+                            </div>
+                            <div class="col-sm-2">
+                                <div class="form-group">
+                                    <label>D4 (%)</label>
+                                    <input type="number" name="d4" value="{{ cliente.d4 ?? 0 }}" class="form-control"
+                                        step="0.01" min="0" max="100" />
+                                </div>
+                            </div>
+                            <div class="col-sm-1">
+                                {% if cliente.descuentos_modified and cliente.codgrupo_descuento %}
+                                <div style="margin-top: 25px;">
+                                    <button type="button" id="btn_reset_descuentos" class="btn btn-sm btn-warning">
+                                        <i class="fa fa-undo"></i>
+                                    </button>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="row" style="margin-top: 10px;">
                     <div class="col-xs-4">
@@ -227,6 +300,10 @@
             <form id="form_delete_cliente" method="post" action="{{ cliente.url() }}" style="display:none;">
                 {{ csrf_field() }}
                 <input type="hidden" name="action" value="delete" />
+            </form>
+            <form id="form_reset_descuentos" method="post" action="{{ cliente.url() }}" style="display:none;">
+                {{ csrf_field() }}
+                <input type="hidden" name="action" value="reset_descuentos" />
             </form>
         </div>
     </div>
@@ -371,7 +448,7 @@
                         </div>
                     </div>
 
-                    {{ clientes_render_hook('cliente_direccion_form_after_codpais', {'fsc': fsc, 'cliente': cliente})|raw }}
+                    {{ render_hook('cliente_direccion_form_after_codpais', {'fsc': fsc, 'cliente': cliente})|raw }}
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">{{ trans('cancelar') }}</button>
@@ -394,6 +471,18 @@
                 callback: function (result) {
                     if (result) {
                         $("#form_delete_cliente").submit();
+                    }
+                }
+            });
+        });
+
+        $("#btn_reset_descuentos").click(function(event) {
+            event.preventDefault();
+            bootbox.confirm({
+                message: '¿Restaurar descuentos a los valores del grupo?',
+                callback: function(result) {
+                    if (result) {
+                        $("#form_reset_descuentos").submit();
                     }
                 }
             });

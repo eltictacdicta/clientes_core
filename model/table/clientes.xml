@@ -196,7 +196,38 @@
         <nombre>codtarifa</nombre>
         <tipo>character varying(6)</tipo>
         <nulo>YES</nulo>
-    </columna>   
+    </columna>
+    <columna>
+        <nombre>d1</nombre>
+        <tipo>decimal(5,2)</tipo>
+        <nulo>YES</nulo>
+    </columna>
+    <columna>
+        <nombre>d2</nombre>
+        <tipo>decimal(5,2)</tipo>
+        <nulo>YES</nulo>
+    </columna>
+    <columna>
+        <nombre>d3</nombre>
+        <tipo>decimal(5,2)</tipo>
+        <nulo>YES</nulo>
+    </columna>
+    <columna>
+        <nombre>d4</nombre>
+        <tipo>decimal(5,2)</tipo>
+        <nulo>YES</nulo>
+    </columna>
+    <columna>
+        <nombre>descuentos_modified</nombre>
+        <tipo>boolean</tipo>
+        <nulo>YES</nulo>
+        <defecto>false</defecto>
+    </columna>
+    <columna>
+        <nombre>codgrupo_descuento</nombre>
+        <tipo>character varying(6)</tipo>
+        <nulo>YES</nulo>
+    </columna>
     <restriccion>
         <nombre>clientes_pkey</nombre>
         <consulta>PRIMARY KEY (codcliente)</consulta>

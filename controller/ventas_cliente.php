@@ -18,9 +18,9 @@
  */
 
 require_once dirname(__DIR__) . '/extras/clientes_controller.php';
-require_once dirname(__DIR__, 3) . '/src/Security/CsrfManager.php';
+require_once dirname(__DIR__) . '/model/core/grupo_descuentos.php';
 
-use FSFramework\Security\CsrfManager;
+use FSFramework\model\grupo_descuentos;
 
 /**
  * Controlador del detalle de un cliente.
@@ -33,6 +33,7 @@ class ventas_cliente extends clientes_controller
     public $cliente;
     public $direcciones;
     public $grupos;
+    public $grupos_descuentos;
     public $regimenes_iva;
 
     public function __construct()
@@ -48,6 +49,7 @@ class ventas_cliente extends clientes_controller
         $this->cliente = FALSE;
         $this->direcciones = [];
         $this->grupos = [];
+        $this->grupos_descuentos = [];
         $this->regimenes_iva = [];
 
         $cod = filter_input(INPUT_GET, 'cod');
@@ -65,6 +67,9 @@ class ventas_cliente extends clientes_controller
                 $grupo_model = new grupo_clientes();
                 $this->grupos = $grupo_model->all();
 
+                $grupoDescModel = new grupo_descuentos();
+                $this->grupos_descuentos = $grupoDescModel->all();
+
                 $action = filter_input(INPUT_GET, 'action') ?? filter_input(INPUT_POST, 'action') ?? '';
 
                 switch ($action) {
@@ -73,23 +78,27 @@ class ventas_cliente extends clientes_controller
                         break;
 
                     case 'delete':
-                        if (CsrfManager::isValid(filter_input(INPUT_POST, '_csrf_token') ?? '')) {
-                            $this->delete_cliente();
-                        } else {
-                            $this->new_error_msg('Token de seguridad no válido.');
-                        }
+                        $this->delete_cliente();
                         return;
 
                     case 'save_dir':
                         $this->save_direccion();
                         break;
 
+                    case 'change_grupo':
+                        $this->change_grupo();
+                        break;
+
+                    case 'change_grupo_descuento':
+                        $this->change_grupo_descuento();
+                        break;
+
+                    case 'reset_descuentos':
+                        $this->reset_descuentos();
+                        break;
+
                     case 'delete_dir':
-                        if (CsrfManager::isValid(filter_input(INPUT_POST, '_csrf_token') ?? '')) {
-                            $this->delete_direccion();
-                        } else {
-                            $this->new_error_msg('Token de seguridad no válido.');
-                        }
+                        $this->delete_direccion();
                         break;
 
                     case 'new_dir':
@@ -124,12 +133,37 @@ class ventas_cliente extends clientes_controller
         $this->cliente->email = filter_input(INPUT_POST, 'email') ?? $this->cliente->email;
         $this->cliente->web = filter_input(INPUT_POST, 'web') ?? $this->cliente->web;
         $this->cliente->coddivisa = !empty(filter_input(INPUT_POST, 'coddivisa')) ? filter_input(INPUT_POST, 'coddivisa') : null;
-        $this->cliente->codgrupo = !empty(filter_input(INPUT_POST, 'codgrupo')) ? filter_input(INPUT_POST, 'codgrupo') : null;
+        $codgrupo = filter_input(INPUT_POST, 'codgrupo');
+        $this->cliente->codgrupo = !empty($codgrupo) ? $codgrupo : '000000';
         $this->cliente->regimeniva = filter_input(INPUT_POST, 'regimeniva') ?? $this->cliente->regimeniva;
         $this->cliente->recargo = filter_input(INPUT_POST, 'recargo') === '1';
         $this->cliente->personafisica = filter_input(INPUT_POST, 'personafisica') === '1';
         $this->cliente->diaspago = filter_input(INPUT_POST, 'diaspago') ?? $this->cliente->diaspago;
         $this->cliente->observaciones = filter_input(INPUT_POST, 'observaciones') ?? $this->cliente->observaciones;
+        $this->cliente->d1 = filter_input(INPUT_POST, 'd1') !== null ? (float) filter_input(INPUT_POST, 'd1') : $this->cliente->d1;
+        $this->cliente->d2 = filter_input(INPUT_POST, 'd2') !== null ? (float) filter_input(INPUT_POST, 'd2') : $this->cliente->d2;
+        $this->cliente->d3 = filter_input(INPUT_POST, 'd3') !== null ? (float) filter_input(INPUT_POST, 'd3') : $this->cliente->d3;
+        $this->cliente->d4 = filter_input(INPUT_POST, 'd4') !== null ? (float) filter_input(INPUT_POST, 'd4') : $this->cliente->d4;
+
+        $codgrupoDescuento = filter_input(INPUT_POST, 'codgrupo_descuento');
+        $this->cliente->codgrupo_descuento = !empty($codgrupoDescuento) ? $codgrupoDescuento : null;
+
+        if ($this->cliente->codgrupo_descuento) {
+            $grupoDescModel = new grupo_descuentos();
+            $grupoDesc = $grupoDescModel->get($this->cliente->codgrupo_descuento);
+            if ($grupoDesc) {
+                $modified = false;
+                foreach (['d1', 'd2', 'd3', 'd4'] as $field) {
+                    $clientVal = $this->cliente->{$field} !== null ? round((float) $this->cliente->{$field}, 2) : null;
+                    $groupVal = $grupoDesc->{$field} !== null ? round((float) $grupoDesc->{$field}, 2) : null;
+                    if ($clientVal !== $groupVal) {
+                        $modified = true;
+                        break;
+                    }
+                }
+                $this->cliente->descuentos_modified = $modified;
+            }
+        }
 
         $debaja = filter_input(INPUT_POST, 'debaja');
         if ($debaja !== null) {
@@ -151,6 +185,10 @@ class ventas_cliente extends clientes_controller
 
     private function delete_cliente()
     {
+        if (!$this->requireMutationCsrf()) {
+            return;
+        }
+
         if (!$this->allow_delete) {
             $this->new_error_msg('No tienes permisos para eliminar.');
             return;
@@ -207,6 +245,10 @@ class ventas_cliente extends clientes_controller
 
     private function delete_direccion()
     {
+        if (!$this->requireMutationCsrf()) {
+            return;
+        }
+
         if (!$this->allow_delete) {
             $this->new_error_msg('No tienes permisos para eliminar.');
             return;
@@ -221,6 +263,86 @@ class ventas_cliente extends clientes_controller
             } else {
                 $this->new_error_msg('Error al eliminar la dirección.');
             }
+        }
+    }
+
+    private function change_grupo()
+    {
+        if (!$this->requireMutationCsrf()) {
+            return;
+        }
+
+        $newCodgrupo = filter_input(INPUT_POST, 'codgrupo');
+        if (empty($newCodgrupo)) {
+            $this->new_error_msg('Debe seleccionar un grupo.');
+            return;
+        }
+
+        $grupoModel = new grupo_clientes();
+        $grupo = $grupoModel->get($newCodgrupo);
+        if (!$grupo) {
+            $this->new_error_msg('Grupo no encontrado.');
+            return;
+        }
+
+        $this->cliente->codgrupo = $newCodgrupo;
+
+        if ($this->cliente->save()) {
+            $this->new_message('Grupo actualizado correctamente.');
+        } else {
+            foreach ($this->cliente->get_errors() as $error) {
+                $this->new_error_msg($error);
+            }
+        }
+    }
+
+    private function change_grupo_descuento()
+    {
+        if (!$this->requireMutationCsrf()) {
+            return;
+        }
+
+        $newCodgrupoDesc = filter_input(INPUT_POST, 'codgrupo_descuento');
+        if (empty($newCodgrupoDesc)) {
+            $this->new_error_msg('Debe seleccionar un grupo de descuentos.');
+            return;
+        }
+
+        $grupoDescModel = new grupo_descuentos();
+        $grupoDesc = $grupoDescModel->get($newCodgrupoDesc);
+        if (!$grupoDesc) {
+            $this->new_error_msg('Grupo de descuentos no encontrado.');
+            return;
+        }
+
+        $this->cliente->codgrupo_descuento = $newCodgrupoDesc;
+        $this->cliente->applyGroupDiscounts($grupoDesc);
+
+        if ($this->cliente->save()) {
+            $this->new_message('Grupo de descuentos y descuentos actualizados correctamente.');
+        } else {
+            foreach ($this->cliente->get_errors() as $error) {
+                $this->new_error_msg($error);
+            }
+        }
+    }
+
+    private function reset_descuentos()
+    {
+        if (!$this->requireMutationCsrf()) {
+            return;
+        }
+
+        if ($this->cliente->resetToGroupDefaults()) {
+            if ($this->cliente->save()) {
+                $this->new_message('Descuentos restaurados a los valores del grupo.');
+            } else {
+                foreach ($this->cliente->get_errors() as $error) {
+                    $this->new_error_msg($error);
+                }
+            }
+        } else {
+            $this->new_error_msg('No se pudo restaurar los descuentos del grupo.');
         }
     }
 }

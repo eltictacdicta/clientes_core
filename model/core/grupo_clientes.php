@@ -75,11 +75,7 @@ class grupo_clientes extends \fs_model
      */
     public function url()
     {
-        if ($this->codgrupo == NULL) {
-            return 'index.php?page=ventas_clientes#grupos';
-        }
-
-        return 'index.php?page=ventas_grupo&cod=' . urlencode($this->codgrupo);
+        return 'index.php?page=ventas_clientes#grupos';
     }
 
     /**

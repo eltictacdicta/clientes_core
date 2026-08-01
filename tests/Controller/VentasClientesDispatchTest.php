@@ -202,6 +202,7 @@ final class VentasClientesDispatchTest extends TestCase
             public $codproveedor;
             public $observaciones;
             public $diaspago;
+            public $codgrupo_descuento;
             public function __construct($data = false) { $this->table_name = "clientes"; }
             public function delete(): bool { return false; }
             public function exists(): bool { return false; }

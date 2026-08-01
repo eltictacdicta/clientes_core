@@ -168,6 +168,27 @@ class cliente extends \fs_model
      */
     public $codtarifa;
 
+    /** @var float|null */
+    public $d1;
+
+    /** @var float|null */
+    public $d2;
+
+    /** @var float|null */
+    public $d3;
+
+    /** @var float|null */
+    public $d4;
+
+    /** @var bool */
+    public $descuentos_modified;
+
+    /**
+     * Código del grupo de descuentos asociado, si lo hay.
+     * @var string|null
+     */
+    public $codgrupo_descuento;
+
     private static $regimenes_iva;
 
     public function __construct($data = FALSE)
@@ -210,6 +231,12 @@ class cliente extends \fs_model
             $this->diaspago = $data['diaspago'];
             $this->codproveedor = $data['codproveedor'];
             $this->codtarifa = $data['codtarifa'];
+            $this->d1 = array_key_exists('d1', $data) && $data['d1'] !== null ? (float) $data['d1'] : null;
+            $this->d2 = array_key_exists('d2', $data) && $data['d2'] !== null ? (float) $data['d2'] : null;
+            $this->d3 = array_key_exists('d3', $data) && $data['d3'] !== null ? (float) $data['d3'] : null;
+            $this->d4 = array_key_exists('d4', $data) && $data['d4'] !== null ? (float) $data['d4'] : null;
+            $this->descuentos_modified = $this->str2bool($data['descuentos_modified'] ?? false);
+            $this->codgrupo_descuento = $data['codgrupo_descuento'] ?? null;
         } else {
             $this->codcliente = NULL;
             $this->nombre = '';
@@ -236,6 +263,12 @@ class cliente extends \fs_model
             $this->diaspago = NULL;
             $this->codproveedor = NULL;
             $this->codtarifa = NULL;
+            $this->d1 = NULL;
+            $this->d2 = NULL;
+            $this->d3 = NULL;
+            $this->d4 = NULL;
+            $this->descuentos_modified = false;
+            $this->codgrupo_descuento = NULL;
         }
 
         $this->load_commercial_extension();
@@ -502,7 +535,68 @@ class cliente extends \fs_model
             return false;
         }
 
+        if ($this->codgrupo === null || $this->codgrupo === '') {
+            $this->new_error_msg("El cliente debe pertenecer a un grupo.");
+            return false;
+        }
+
         return true;
+    }
+
+    public function getEffectiveDiscounts(): array
+    {
+        if ($this->codgrupo_descuento === null) {
+            return ['d1' => 0.00, 'd2' => 0.00, 'd3' => 0.00, 'd4' => 0.00];
+        }
+
+        $grupoDesc = new \FSFramework\model\grupo_descuentos();
+        $grupoDesc = $grupoDesc->get($this->codgrupo_descuento);
+
+        $result = [];
+        foreach (['d1', 'd2', 'd3', 'd4'] as $field) {
+            $result[$field] = $this->{$field} !== null
+                ? (float) $this->{$field}
+                : ($grupoDesc ? (float) $grupoDesc->{$field} : 0.00);
+        }
+
+        return $result;
+    }
+
+    public function applyGroupDiscounts(object $grupoDescuentos): void
+    {
+        foreach (['d1', 'd2', 'd3', 'd4'] as $field) {
+            $this->{$field} = (float) $grupoDescuentos->{$field};
+        }
+        $this->descuentos_modified = false;
+    }
+
+    public function resetToGroupDefaults(): bool
+    {
+        if ($this->codgrupo_descuento === null) {
+            return false;
+        }
+
+        $grupoModel = new \FSFramework\model\grupo_descuentos();
+        $grupo = $grupoModel->get($this->codgrupo_descuento);
+        if (!$grupo) {
+            return false;
+        }
+
+        $this->applyGroupDiscounts($grupo);
+        return true;
+    }
+
+    /**
+     * Assigns clients without a group to the given group code.
+     * Used by the plugin activation migration.
+     */
+    public function assignOrphanClientsToGroup(string $codgrupo): bool
+    {
+        return (bool) $this->db->exec(
+            "UPDATE " . $this->table_name
+            . " SET codgrupo = " . $this->var2str($codgrupo)
+            . " WHERE codgrupo IS NULL;"
+        );
     }
 
     public function save()
@@ -583,7 +677,13 @@ class cliente extends \fs_model
             . ", regimeniva = " . $this->var2str($this->regimeniva)
             . ", recargo = " . $this->var2str($this->recargo)
             . ", personafisica = " . $this->var2str($this->personafisica)
-            . ", diaspago = " . $this->var2str($this->diaspago);
+            . ", diaspago = " . $this->var2str($this->diaspago)
+            . ", d1 = " . $this->var2str($this->d1)
+            . ", d2 = " . $this->var2str($this->d2)
+            . ", d3 = " . $this->var2str($this->d3)
+            . ", d4 = " . $this->var2str($this->d4)
+            . ", descuentos_modified = " . $this->var2str($this->descuentos_modified)
+            . ", codgrupo_descuento = " . $this->var2str($this->codgrupo_descuento);
 
         if (!$use_extension) {
             $sql .= ", codserie = " . $this->var2str($this->codserie)
@@ -600,7 +700,7 @@ class cliente extends \fs_model
 
     private function buildInsertSql(bool $use_extension): string
     {
-        $columns = "codcliente,nombre,razonsocial,tipoidfiscal,cifnif,telefono1,telefono2,fax,email,web,codgrupo,debaja,fechabaja,fechaalta,observaciones,regimeniva,recargo,personafisica,diaspago";
+        $columns = "codcliente,nombre,razonsocial,tipoidfiscal,cifnif,telefono1,telefono2,fax,email,web,codgrupo,debaja,fechabaja,fechaalta,observaciones,regimeniva,recargo,personafisica,diaspago,d1,d2,d3,d4,descuentos_modified,codgrupo_descuento";
         $values = $this->var2str($this->codcliente)
             . "," . $this->var2str($this->nombre)
             . "," . $this->var2str($this->razonsocial)
@@ -619,7 +719,13 @@ class cliente extends \fs_model
             . "," . $this->var2str($this->regimeniva)
             . "," . $this->var2str($this->recargo)
             . "," . $this->var2str($this->personafisica)
-            . "," . $this->var2str($this->diaspago);
+            . "," . $this->var2str($this->diaspago)
+            . "," . $this->var2str($this->d1)
+            . "," . $this->var2str($this->d2)
+            . "," . $this->var2str($this->d3)
+            . "," . $this->var2str($this->d4)
+            . "," . $this->var2str($this->descuentos_modified)
+            . "," . $this->var2str($this->codgrupo_descuento);
 
         if (!$use_extension) {
             $columns .= ",codserie,coddivisa,codpago,codagente,codproveedor,codtarifa";

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Document   : gruposdescuentos.xml
+    Description:
+        Estructura de la tabla gruposdescuentos.
+        Entidad separada de gruposclientes para gestionar descuentos.
+-->
+<tabla>
+    <columna>
+        <nombre>codgrupo_descuento</nombre>
+        <tipo>character varying(6)</tipo>
+        <nulo>NO</nulo>
+    </columna>
+    <columna>
+        <nombre>nombre</nombre>
+        <tipo>character varying(100)</tipo>
+        <nulo>NO</nulo>
+    </columna>
+    <columna>
+        <nombre>d1</nombre>
+        <tipo>decimal(5,2)</tipo>
+        <nulo>YES</nulo>
+    </columna>
+    <columna>
+        <nombre>d2</nombre>
+        <tipo>decimal(5,2)</tipo>
+        <nulo>YES</nulo>
+    </columna>
+    <columna>
+        <nombre>d3</nombre>
+        <tipo>decimal(5,2)</tipo>
+        <nulo>YES</nulo>
+    </columna>
+    <columna>
+        <nombre>d4</nombre>
+        <tipo>decimal(5,2)</tipo>
+        <nulo>YES</nulo>
+    </columna>
+    <restriccion>
+        <nombre>gruposdescuentos_pkey</nombre>
+        <consulta>PRIMARY KEY (codgrupo_descuento)</consulta>
+    </restriccion>
+</tabla>

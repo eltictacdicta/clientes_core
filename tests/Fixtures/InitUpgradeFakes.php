@@ -82,6 +82,12 @@ namespace FSFramework\model {
         /** If set, save() throws this on first call. */
         public static ?\Throwable $saveException = null;
 
+        /** Number of times assignOrphanClientsToGroup() was invoked. */
+        public static int $assignOrphanCalls = 0;
+
+        /** Last codgrupo passed to assignOrphanClientsToGroup(). */
+        public static ?string $assignOrphanCodgrupo = null;
+
         /** @var object The stub db handle (kept for backward compat). */
         public $db;
 
@@ -121,6 +127,13 @@ namespace FSFramework\model {
             return true;
         }
 
+        public function assignOrphanClientsToGroup(string $codgrupo): bool
+        {
+            self::$assignOrphanCalls++;
+            self::$assignOrphanCodgrupo = $codgrupo;
+            return true;
+        }
+
         public function delete(): bool
         {
             return false;
@@ -138,6 +151,75 @@ namespace FSFramework\model {
             self::$table_has_rows_calls = 0;
             self::$saveCalls = 0;
             self::$saveException = null;
+            self::$assignOrphanCalls = 0;
+            self::$assignOrphanCodgrupo = null;
+        }
+    }
+
+    class grupo_clientes extends \fs_model
+    {
+        /** @var self[] */
+        public static array $instances = [];
+
+        public static int $getCalls = 0;
+        public static int $saveCalls = 0;
+
+        /** @var array<string, array<string, mixed>>|null */
+        public static ?array $storedGroups = null;
+
+        public $codgrupo;
+        public $nombre;
+        public $codtarifa;
+
+        public function __construct()
+        {
+            self::$instances[] = $this;
+        }
+
+        public function get(string $cod)
+        {
+            self::$getCalls++;
+            if (self::$storedGroups !== null && isset(self::$storedGroups[$cod])) {
+                $instance = new self();
+                foreach (self::$storedGroups[$cod] as $key => $value) {
+                    $instance->{$key} = $value;
+                }
+                return $instance;
+            }
+
+            return false;
+        }
+
+        public function save(): bool
+        {
+            self::$saveCalls++;
+            if (self::$storedGroups === null) {
+                self::$storedGroups = [];
+            }
+            self::$storedGroups[(string) $this->codgrupo] = [
+                'codgrupo' => $this->codgrupo,
+                'nombre' => $this->nombre,
+                'codtarifa' => $this->codtarifa,
+            ];
+            return true;
+        }
+
+        public function delete(): bool
+        {
+            return false;
+        }
+
+        public function exists(): bool
+        {
+            return false;
+        }
+
+        public static function resetStatic(): void
+        {
+            self::$instances = [];
+            self::$getCalls = 0;
+            self::$saveCalls = 0;
+            self::$storedGroups = null;
         }
     }
 }
