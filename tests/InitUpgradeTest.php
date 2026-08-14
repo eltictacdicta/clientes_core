@@ -162,7 +162,7 @@ class InitUpgradeTest extends TestCase
     }
 
     /**
-     * Case 2 — flag already set → no cliente, no DB hit, no save.
+     * Case 2 — flag already set and table non-empty → no insert, no save.
      *
      * Spec: default-client-on-activation#Scenario:Re-activation after deactivation is a no-op.
      */
@@ -170,18 +170,15 @@ class InitUpgradeTest extends TestCase
     {
         $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
         $GLOBALS['config2']['clientes_core_discounts_migrated'] = '1';
+        \FSFramework\model\cliente::$table_has_rows_result = true;
+        \FSFramework\model\grupo_clientes::$table_has_rows_result = true;
 
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 
-        $this->assertCount(
-            0,
-            \FSFramework\model\cliente::$instances,
-            'No cliente instance must be created when the flag is set'
-        );
         $this->assertSame(
             0,
-            \FSFramework\model\cliente::$table_has_rows_calls,
-            'No table_has_rows() call must be issued when the flag short-circuits'
+            \FSFramework\model\cliente::$saveCalls,
+            'save() must not run when the table already has rows'
         );
         $this->assertSame(
             '1',
@@ -373,6 +370,8 @@ class InitUpgradeTest extends TestCase
     {
         $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
         $GLOBALS['config2']['clientes_core_discounts_migrated'] = '1';
+        \FSFramework\model\grupo_clientes::$table_has_rows_result = true;
+        \FSFramework\model\cliente::$table_has_rows_result = true;
 
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 

@@ -164,6 +164,9 @@ namespace FSFramework\model {
         public static int $getCalls = 0;
         public static int $saveCalls = 0;
 
+        public static ?bool $table_has_rows_result = null;
+        public static int $table_has_rows_calls = 0;
+
         /** @var array<string, array<string, mixed>>|null */
         public static ?array $storedGroups = null;
 
@@ -174,6 +177,16 @@ namespace FSFramework\model {
         public function __construct()
         {
             self::$instances[] = $this;
+        }
+
+        public function table_has_rows(): bool
+        {
+            self::$table_has_rows_calls++;
+            if (self::$table_has_rows_result !== null) {
+                return self::$table_has_rows_result;
+            }
+
+            return self::$storedGroups !== null && self::$storedGroups !== [];
         }
 
         public function get(string $cod)
@@ -220,6 +233,8 @@ namespace FSFramework\model {
             self::$getCalls = 0;
             self::$saveCalls = 0;
             self::$storedGroups = null;
+            self::$table_has_rows_result = null;
+            self::$table_has_rows_calls = 0;
         }
     }
 }

@@ -22,6 +22,7 @@ namespace FSFramework\Plugins\clientes_core;
 use FSFramework\Event\FSEventDispatcher;
 use FSFramework\Event\TwigInitEvent;
 use FSFramework\model\cliente;
+use FSFramework\model\grupo_clientes;
 use FSFramework\model\grupo_descuentos;
 use FSFramework\View\ViewHookRegistry;
 
@@ -67,21 +68,24 @@ class Init
         $cache = new \fs_cache();
         $cache->delete('fs_checked_tables');
 
-        if (!$settings->get('clientes_core_default_seeded')) {
-            try {
-                $cliente = new cliente();
-                if (!$cliente->table_has_rows()) {
-                    $cliente->nombre = 'Cliente por defecto';
-                    $cliente->save();
-                }
+        try {
+            self::ensureDefaultClientGroup();
 
+            $cliente = new cliente();
+            if (!$cliente->table_has_rows()) {
+                $cliente->nombre = 'Cliente por defecto';
+                $cliente->codgrupo = '000001';
+                $cliente->save();
+            }
+
+            if (!$settings->get('clientes_core_default_seeded')) {
                 $settings->set('clientes_core_default_seeded', '1');
                 $settings->save();
-            } catch (\Throwable $e) {
-                error_log('[clientes_core] Default seed failed: ' . $e->getMessage());
-                // A failed seed must never break plugin activation.
-                // The flag was not set, so the next activation can retry.
             }
+        } catch (\Throwable $e) {
+            error_log('[clientes_core] Default seed failed: ' . $e->getMessage());
+            // A failed seed must never break plugin activation.
+            // The flag was not set, so the next activation can retry.
         }
 
         // Legacy migration (v1 → v2): moved from grupo_clientes to grupo_descuentos.
@@ -184,5 +188,18 @@ class Init
             }));
         } catch (\LogicException) {
         }
+    }
+
+    private static function ensureDefaultClientGroup(): void
+    {
+        $grupoModel = new grupo_clientes();
+        if ($grupoModel->table_has_rows()) {
+            return;
+        }
+
+        $grupo = new grupo_clientes();
+        $grupo->codgrupo = '000001';
+        $grupo->nombre = 'General';
+        $grupo->save();
     }
 }
