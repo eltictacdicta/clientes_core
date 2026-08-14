@@ -223,7 +223,10 @@ class cliente extends \fs_model
                 $this->fechabaja = date('d-m-Y', strtotime($data['fechabaja']));
             }
 
-            $this->fechaalta = date('d-m-Y', strtotime($data['fechaalta']));
+            $this->fechaalta = NULL;
+            if ($data['fechaalta']) {
+                $this->fechaalta = date('d-m-Y', strtotime($data['fechaalta']));
+            }
             $this->observaciones = $this->no_html($data['observaciones']);
             $this->regimeniva = $data['regimeniva'];
             $this->recargo = $this->str2bool($data['recargo']);
