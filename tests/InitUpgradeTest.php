@@ -67,9 +67,9 @@ use PHPUnit\Framework\TestCase;
  * and lives for the duration of each separate process. No global
  * state leaks between tests.
  *
- * @runTestsInSeparateProcesses
- * @preserveGlobalState disabled
  */
+#[\PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses]
+#[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
 class InitUpgradeTest extends TestCase
 {
     /** Guard against registering the autoloader twice in the same process. */
