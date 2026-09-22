@@ -341,6 +341,14 @@ class ventas_clientes extends clientes_controller
         $grupo = new grupo_clientes();
         $g = $grupo->get($cod);
         if ($g) {
+            $inUse = (new cliente())->countByGroup($cod);
+            if ($inUse > 0) {
+                $this->new_error_msg('No se puede eliminar el grupo: hay clientes asignados a él.');
+                $this->grupos = $grupo->all();
+                $this->load_clientes();
+                return;
+            }
+
             if ($g->delete()) {
                 $this->new_message('Grupo eliminado correctamente.');
             } else {
