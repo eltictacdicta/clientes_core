@@ -65,6 +65,7 @@ nombre-grupo: "Group name"
 codigo-grupo: "Code"
 tarifa-grupo: "Group rate"
 sin-grupo: "No group"
+grupo-descuentos: "Discount group"
 
 # Messages
 cliente-guardado: "Client saved successfully."
@@ -85,6 +86,8 @@ error-razonsocial-cliente: "Invalid legal name (maximum 100 characters)."
 error-nombre-grupo: "Invalid group name."
 grupo-obligatorio: "You must select a group to save."
 seleccione-grupo: "Select a group"
+grupo-descuentos-obligatorio: "You must select a discount group to save."
+seleccione-grupo-descuentos: "Select a discount group"
 sin-grupos-disponibles: "No client groups available. Create a group before adding clients."
 
 # Actions
