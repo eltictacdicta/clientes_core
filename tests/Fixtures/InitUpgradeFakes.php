@@ -24,7 +24,7 @@ declare(strict_types=1);
  *
  * Loaded by a prepended autoloader registered in
  * InitUpgradeTest::setUp() — see the test class docblock for the
- * rationale. The two fakes here stand in for:
+ * rationale. The fakes here stand in for:
  *
  *   - \FSFramework\model\cliente  → the production cliente model
  *     (plugins/clientes_core/model/core/cliente.php). The fake skips
@@ -32,6 +32,11 @@ declare(strict_types=1);
  *     $this->db whose select() returns a test-controlled array.
  *     The fake's save() can be made to throw to exercise the
  *     seeder's failure-isolation path.
+ *
+ *   - \FSFramework\model\grupo_clientes → the client-group model.
+ *
+ *   - \FSFramework\model\grupo_descuentos → the discount-group
+ *     model, consumed by the mandatory-group backfill.
  *
  *   - \fs_settings  → the production settings store
  *     (base/fs_settings.php). The fake reads/writes the same
@@ -88,6 +93,27 @@ namespace FSFramework\model {
         /** Last codgrupo passed to assignOrphanClientsToGroup(). */
         public static ?string $assignOrphanCodgrupo = null;
 
+        /** Number of times assignOrphanClientsToDiscountGroup() was invoked. */
+        public static int $assignDiscountOrphanCalls = 0;
+
+        /** Last codgrupo_descuento passed to assignOrphanClientsToDiscountGroup(). */
+        public static ?string $assignDiscountOrphanCodgrupo = null;
+
+        /** If set, assignOrphanClientsToDiscountGroup() throws this. */
+        public static ?\Throwable $assignDiscountOrphanException = null;
+
+        /** Number of times countByGroup() was invoked. */
+        public static int $countByGroupCalls = 0;
+
+        /** Number of times countByDiscountGroup() was invoked. */
+        public static int $countByDiscountGroupCalls = 0;
+
+        /** @var string|null Seeded client group code. */
+        public $codgrupo;
+
+        /** @var string|null Seeded discount group code. */
+        public $codgrupo_descuento;
+
         /** @var object The stub db handle (kept for backward compat). */
         public $db;
 
@@ -134,6 +160,28 @@ namespace FSFramework\model {
             return true;
         }
 
+        public function assignOrphanClientsToDiscountGroup(string $codgrupoDescuento): bool
+        {
+            self::$assignDiscountOrphanCalls++;
+            self::$assignDiscountOrphanCodgrupo = $codgrupoDescuento;
+            if (self::$assignDiscountOrphanException !== null) {
+                throw self::$assignDiscountOrphanException;
+            }
+            return true;
+        }
+
+        public function countByGroup(string $codgrupo): int
+        {
+            self::$countByGroupCalls++;
+            return 0;
+        }
+
+        public function countByDiscountGroup(string $codgrupoDescuento): int
+        {
+            self::$countByDiscountGroupCalls++;
+            return 0;
+        }
+
         public function delete(): bool
         {
             return false;
@@ -153,6 +201,11 @@ namespace FSFramework\model {
             self::$saveException = null;
             self::$assignOrphanCalls = 0;
             self::$assignOrphanCodgrupo = null;
+            self::$assignDiscountOrphanCalls = 0;
+            self::$assignDiscountOrphanCodgrupo = null;
+            self::$assignDiscountOrphanException = null;
+            self::$countByGroupCalls = 0;
+            self::$countByDiscountGroupCalls = 0;
         }
     }
 
@@ -235,6 +288,93 @@ namespace FSFramework\model {
             self::$storedGroups = null;
             self::$table_has_rows_result = null;
             self::$table_has_rows_calls = 0;
+        }
+    }
+
+    /**
+     * In-memory fake of \FSFramework\model\grupo_descuentos.
+     *
+     * Needed by InitUpgradeTest because the production class is not
+     * autoloadable in the test process (its model file lives outside
+     * the root PSR-4 map used by these tests). Mirrors the API surface
+     * the activation migration consumes: get(), save() and
+     * table_has_rows().
+     */
+    class grupo_descuentos extends \fs_model
+    {
+        /** @var self[] */
+        public static array $instances = [];
+
+        public static int $getCalls = 0;
+        public static int $saveCalls = 0;
+
+        /** @var array<string, array<string, mixed>>|null */
+        public static ?array $storedGroups = null;
+
+        public $codgrupo_descuento;
+        public $nombre;
+        public $d1;
+        public $d2;
+        public $d3;
+        public $d4;
+
+        public function __construct()
+        {
+            self::$instances[] = $this;
+        }
+
+        public function table_has_rows(): bool
+        {
+            return self::$storedGroups !== null && self::$storedGroups !== [];
+        }
+
+        public function get(string $cod)
+        {
+            self::$getCalls++;
+            if (self::$storedGroups !== null && isset(self::$storedGroups[$cod])) {
+                $instance = new self();
+                foreach (self::$storedGroups[$cod] as $key => $value) {
+                    $instance->{$key} = $value;
+                }
+                return $instance;
+            }
+
+            return false;
+        }
+
+        public function save(): bool
+        {
+            self::$saveCalls++;
+            if (self::$storedGroups === null) {
+                self::$storedGroups = [];
+            }
+            self::$storedGroups[(string) $this->codgrupo_descuento] = [
+                'codgrupo_descuento' => $this->codgrupo_descuento,
+                'nombre' => $this->nombre,
+                'd1' => $this->d1,
+                'd2' => $this->d2,
+                'd3' => $this->d3,
+                'd4' => $this->d4,
+            ];
+            return true;
+        }
+
+        public function delete(): bool
+        {
+            return false;
+        }
+
+        public function exists(): bool
+        {
+            return false;
+        }
+
+        public static function resetStatic(): void
+        {
+            self::$instances = [];
+            self::$getCalls = 0;
+            self::$saveCalls = 0;
+            self::$storedGroups = null;
         }
     }
 }

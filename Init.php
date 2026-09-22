@@ -68,13 +68,17 @@ class Init
         $cache = new \fs_cache();
         $cache->delete('fs_checked_tables');
 
+        // (1) Defaults + default-client seed. Both default groups are guaranteed
+        // BEFORE the seed, because the seed now passes the mandatory-group test().
         try {
             self::ensureDefaultClientGroup();
+            self::ensureDefaultDiscountGroup();
 
             $cliente = new cliente();
             if (!$cliente->table_has_rows()) {
                 $cliente->nombre = 'Cliente por defecto';
                 $cliente->codgrupo = '000001';
+                $cliente->codgrupo_descuento = '000000';
                 $cliente->save();
             }
 
@@ -88,29 +92,56 @@ class Init
             // The flag was not set, so the next activation can retry.
         }
 
-        // Legacy migration (v1 → v2): moved from grupo_clientes to grupo_descuentos.
-        // Only runs once via the flag; safe to leave as a no-op for new installs.
-        if ($settings->get('clientes_core_discounts_migrated')) {
+        // (2) Legacy migration (v1 → v2) flag. Kept for compatibility; the
+        // orphan backfill it used to own now lives in the mandatory-group block.
+        if (!$settings->get('clientes_core_discounts_migrated')) {
+            try {
+                self::ensureDefaultDiscountGroup();
+
+                $settings->set('clientes_core_discounts_migrated', '1');
+                $settings->save();
+            } catch (\Throwable $e) {
+                error_log('[clientes_core] Discount migration failed: ' . $e->getMessage());
+                // A failed migration must never break plugin activation.
+            }
+        }
+
+        // (3) Mandatory-group backfill, gated by its own flag.
+        self::runMandatoryGroupBackfill($settings);
+    }
+
+    /**
+     * Guarantees the two default groups exist and backfills legacy clients
+     * that lack them, in a single idempotent, data-only migration block.
+     *
+     * The block is gated by the NEW fs_settings key
+     * `clientes_core_discount_group_required`. It must not reuse
+     * `clientes_core_discounts_migrated`, which is already set on installs
+     * that ran the previous migration and would make this a permanent no-op.
+     *
+     * A failure leaves the flag unset so the next activation retries, and
+     * never breaks plugin activation.
+     */
+    private static function runMandatoryGroupBackfill(\fs_settings $settings): void
+    {
+        if ($settings->get('clientes_core_discount_group_required')) {
             return;
         }
 
         try {
-            $grupoDescModel = new grupo_descuentos();
-            if (!$grupoDescModel->get('000000')) {
-                $grupoDesc = new grupo_descuentos();
-                $grupoDesc->codgrupo_descuento = '000000';
-                $grupoDesc->nombre = 'Personalizado';
-                $grupoDesc->save();
-            }
+            // Ensure steps first: the backfill writes codes that must exist.
+            self::ensureDefaultClientGroup();
+            self::ensureDefaultDiscountGroup();
 
             $cliente = new cliente();
-            $cliente->assignOrphanClientsToGroup('000000');
+            $cliente->assignOrphanClientsToGroup('000001');
+            $cliente->assignOrphanClientsToDiscountGroup('000000');
 
-            $settings->set('clientes_core_discounts_migrated', '1');
+            $settings->set('clientes_core_discount_group_required', '1');
             $settings->save();
         } catch (\Throwable $e) {
-            error_log('[clientes_core] Discount migration failed: ' . $e->getMessage());
-            // A failed migration must never break plugin activation.
+            error_log('[clientes_core] Mandatory group backfill failed: ' . $e->getMessage());
+            // Flag left unset => the next activation retries.
         }
     }
 
@@ -193,13 +224,34 @@ class Init
     private static function ensureDefaultClientGroup(): void
     {
         $grupoModel = new grupo_clientes();
-        if ($grupoModel->table_has_rows()) {
+        if ($grupoModel->get('000001')) {
             return;
         }
 
         $grupo = new grupo_clientes();
         $grupo->codgrupo = '000001';
         $grupo->nombre = 'General';
+        $grupo->save();
+    }
+
+    /**
+     * Guarantees the default discount group '000000' "Personalizado" exists.
+     * Idempotent by code lookup, never by table emptiness.
+     */
+    private static function ensureDefaultDiscountGroup(): void
+    {
+        $model = new grupo_descuentos();
+        if ($model->get('000000')) {
+            return;
+        }
+
+        $grupo = new grupo_descuentos();
+        $grupo->codgrupo_descuento = '000000';
+        $grupo->nombre = 'Personalizado';
+        $grupo->d1 = 0.00;
+        $grupo->d2 = 0.00;
+        $grupo->d3 = 0.00;
+        $grupo->d4 = 0.00;
         $grupo->save();
     }
 }

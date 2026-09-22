@@ -543,6 +543,11 @@ class cliente extends \fs_model
             return false;
         }
 
+        if ($this->codgrupo_descuento === null || $this->codgrupo_descuento === '') {
+            $this->new_error_msg("El cliente debe tener un grupo de descuentos.");
+            return false;
+        }
+
         return true;
     }
 
@@ -600,6 +605,47 @@ class cliente extends \fs_model
             . " SET codgrupo = " . $this->var2str($codgrupo)
             . " WHERE codgrupo IS NULL;"
         );
+    }
+
+    /**
+     * Assigns clients without a discount group to the given discount group code.
+     * Used by the plugin activation migration (mandatory-group backfill).
+     */
+    public function assignOrphanClientsToDiscountGroup(string $codgrupoDescuento): bool
+    {
+        return (bool) $this->db->exec(
+            "UPDATE " . $this->table_name
+            . " SET codgrupo_descuento = " . $this->var2str($codgrupoDescuento)
+            . " WHERE codgrupo_descuento IS NULL;"
+        );
+    }
+
+    /**
+     * Counts how many clients reference the given client group code.
+     * Used by the in-use deletion guard.
+     */
+    public function countByGroup(string $codgrupo): int
+    {
+        $data = $this->db->select(
+            "SELECT COUNT(*) as total FROM " . $this->table_name
+            . " WHERE codgrupo = " . $this->var2str($codgrupo) . ";"
+        );
+
+        return $data ? intval($data[0]['total']) : 0;
+    }
+
+    /**
+     * Counts how many clients reference the given discount group code.
+     * Used by the in-use deletion guard.
+     */
+    public function countByDiscountGroup(string $codgrupoDescuento): int
+    {
+        $data = $this->db->select(
+            "SELECT COUNT(*) as total FROM " . $this->table_name
+            . " WHERE codgrupo_descuento = " . $this->var2str($codgrupoDescuento) . ";"
+        );
+
+        return $data ? intval($data[0]['total']) : 0;
     }
 
     public function save()
