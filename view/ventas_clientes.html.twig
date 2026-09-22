@@ -201,7 +201,7 @@
                                     <td>{{ g.nombre }}</td>
                                     <td>{{ g.codtarifa ?: '-' }}</td>
                                     <td class="text-right">
-                                        {% if fsc.allow_delete and g.codgrupo != '000000' %}
+                                        {% if fsc.allow_delete and g.codgrupo != '000001' %}
                                         <form method="post" style="display:inline;" onsubmit="return confirm('{{ trans('confirmar-eliminar') }}');">
                                             {{ csrf_field() }}
                                             <input type="hidden" name="action" value="delete_grupo" />
