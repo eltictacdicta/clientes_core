@@ -6,7 +6,17 @@
  */
 #}
 
+{% import 'Macro/Alpine.html.twig' as alpine %}
+
 {{ include('header.html.twig') }}
+
+{{ alpine.boot() }}
+
+<style>
+    [x-cloak] {
+        display: none !important;
+    }
+</style>
 
 {% if fsc.cliente %}
 {% set cliente = fsc.cliente %}
@@ -46,7 +56,7 @@
             </h3>
         </div>
         <div class="panel-body">
-            <form id="form_edit_cliente" action="{{ cliente.url() }}" method="post">
+            <form id="form_edit_cliente" action="{{ cliente.url() }}" method="post" x-data="clienteGrupoRequired">
                 {{ csrf_field() }}
                 <input type="hidden" name="action" value="save_cliente" />
                 <input type="hidden" name="codcliente" value="{{ cliente.codcliente }}" />
@@ -136,15 +146,18 @@
                     </div>
                     <div class="col-sm-3">
                         <div class="form-group">
-                            <label>{{ trans('grupo-cliente') }}</label>
-                            <select name="codgrupo" class="form-control">
-                                <option value="">{{ trans('sin-grupo') }}</option>
+                            <label>{{ trans('grupo-cliente') }} *</label>
+                            <select name="codgrupo" class="form-control" x-model="codgrupo" required>
+                                <option value="" disabled{% if not cliente.codgrupo %} selected{% endif %}>— {{ trans('seleccione-grupo') }} —</option>
                                 {% for g in fsc.grupos %}
                                 <option value="{{ g.codgrupo }}"{% if cliente.codgrupo == g.codgrupo %} selected{% endif %}>
                                     {{ g.nombre }}
                                 </option>
                                 {% endfor %}
                             </select>
+                            <p class="help-block text-danger" x-show="missing()" x-cloak>
+                                {{ trans('grupo-obligatorio') }}
+                            </p>
                         </div>
                     </div>
                     <div class="col-sm-2">
@@ -290,7 +303,7 @@
                             <i class="fa fa-refresh fa-fw" aria-hidden="true"></i>
                             <span class="hidden-xs hidden-sm">{{ trans('deshacer') }}</span>
                         </a>
-                        <button class="btn btn-sm btn-primary" type="submit">
+                        <button class="btn btn-sm btn-primary" type="submit" :disabled="missing()">
                             <i class="fa fa-floppy-o fa-fw" aria-hidden="true"></i>
                             <span class="hidden-xs">{{ trans('guardar') }}</span>
                         </button>
@@ -491,5 +504,37 @@
 </script>
 
 {% endif %}
+
+{# Alpine CSP component registration — nonce'd classic script, idempotent via
+   a window marker so a re-executed script cannot double-register. #}
+<script {{ csp_nonce_attr() }}>
+(function () {
+    if (window.__clientesCoreGrupoRequiredRegistered === true) { return; }
+
+    function registerClienteGrupoRequired() {
+        if (window.__clientesCoreGrupoRequiredRegistered === true) { return; }
+        window.__clientesCoreGrupoRequiredRegistered = true;
+
+        Alpine.data('clienteGrupoRequired', function () {
+            return {
+                codgrupo: '',
+                init: function () {
+                    var select = this.$el.querySelector('select[name="codgrupo"]');
+                    if (select) { this.codgrupo = select.value || ''; }
+                },
+                missing: function () {
+                    return this.codgrupo === '' || this.codgrupo === null;
+                }
+            };
+        });
+    }
+
+    if (window.Alpine) {
+        registerClienteGrupoRequired();
+    } else {
+        document.addEventListener('alpine:init', registerClienteGrupoRequired);
+    }
+})();
+</script>
 
 {{ include('footer.html.twig') }}

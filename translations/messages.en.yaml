@@ -83,6 +83,9 @@ error-codigo-cliente: "Invalid client code."
 error-nombre-cliente: "Invalid client name (1-100 characters)."
 error-razonsocial-cliente: "Invalid legal name (maximum 100 characters)."
 error-nombre-grupo: "Invalid group name."
+grupo-obligatorio: "You must select a group to save."
+seleccione-grupo: "Select a group"
+sin-grupos-disponibles: "No client groups available. Create a group before adding clients."
 
 # Actions
 guardar: "Save"
