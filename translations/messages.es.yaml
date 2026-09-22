@@ -83,6 +83,9 @@ error-codigo-cliente: "Código de cliente no válido."
 error-nombre-cliente: "Nombre de cliente no válido (1-100 caracteres)."
 error-razonsocial-cliente: "Razón social del cliente no válida (máximo 100 caracteres)."
 error-nombre-grupo: "Nombre de grupo no válido."
+grupo-obligatorio: "Debe seleccionar un grupo para guardar."
+seleccione-grupo: "Seleccione un grupo"
+sin-grupos-disponibles: "No hay grupos de clientes disponibles. Cree un grupo antes de añadir clientes."
 
 # Acciones
 guardar: "Guardar"

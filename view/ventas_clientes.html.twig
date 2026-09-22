@@ -6,7 +6,17 @@
  */
 #}
 
+{% import 'Macro/Alpine.html.twig' as alpine %}
+
 {{ include('header.html.twig') }}
+
+{{ alpine.boot() }}
+
+<style>
+    [x-cloak] {
+        display: none !important;
+    }
+</style>
 
 <div class="container-fluid" style="margin-bottom: 10px;">
     <div class="row">
@@ -246,7 +256,7 @@
 <div class="modal fade" id="modal_nuevo_cliente" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <form action="{{ fsc.url() }}" method="post">
+            <form action="{{ fsc.url() }}" method="post" x-data="clienteGrupoRequired">
                 {{ csrf_field() }}
                 <input type="hidden" name="action" value="nuevo_cliente"/>
                 <div class="modal-header">
@@ -254,6 +264,11 @@
                     <h4 class="modal-title">{{ trans('nuevo-cliente') }}</h4>
                 </div>
                 <div class="modal-body">
+                    {% if fsc.grupos|length == 0 %}
+                    <div class="alert alert-warning">
+                        {{ trans('sin-grupos-disponibles') }}
+                    </div>
+                    {% endif %}
                     <div class="row">
                         <div class="col-sm-4">
                             <div class="form-group">
@@ -298,20 +313,23 @@
                         </div>
                         <div class="col-sm-4">
                             <div class="form-group">
-                                <label>{{ trans('grupo-cliente') }}</label>
-                                <select name="codgrupo" class="form-control">
-                                    <option value="">{{ trans('sin-grupo') }}</option>
+                                <label>{{ trans('grupo-cliente') }} *</label>
+                                <select name="codgrupo" class="form-control" x-model="codgrupo" required>
+                                    <option value="" disabled selected>— {{ trans('seleccione-grupo') }} —</option>
                                     {% for g in fsc.grupos %}
                                     <option value="{{ g.codgrupo }}">{{ g.nombre }}</option>
                                     {% endfor %}
                                 </select>
+                                <p class="help-block text-danger" x-show="missing()" x-cloak>
+                                    {{ trans('grupo-obligatorio') }}
+                                </p>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">{{ trans('cancelar') }}</button>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" :disabled="missing()">
                         <i class="fa fa-floppy-o"></i> {{ trans('guardar') }}
                     </button>
                 </div>
@@ -330,6 +348,38 @@
             $('#tab_grupos a').tab('show');
         }
     });
+</script>
+
+{# Alpine CSP component registration — nonce'd classic script, idempotent via
+   a window marker so a re-executed script cannot double-register. #}
+<script {{ csp_nonce_attr() }}>
+(function () {
+    if (window.__clientesCoreGrupoRequiredRegistered === true) { return; }
+
+    function registerClienteGrupoRequired() {
+        if (window.__clientesCoreGrupoRequiredRegistered === true) { return; }
+        window.__clientesCoreGrupoRequiredRegistered = true;
+
+        Alpine.data('clienteGrupoRequired', function () {
+            return {
+                codgrupo: '',
+                init: function () {
+                    var select = this.$el.querySelector('select[name="codgrupo"]');
+                    if (select) { this.codgrupo = select.value || ''; }
+                },
+                missing: function () {
+                    return this.codgrupo === '' || this.codgrupo === null;
+                }
+            };
+        });
+    }
+
+    if (window.Alpine) {
+        registerClienteGrupoRequired();
+    } else {
+        document.addEventListener('alpine:init', registerClienteGrupoRequired);
+    }
+})();
 </script>
 
 {{ include('footer.html.twig') }}
