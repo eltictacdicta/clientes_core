@@ -54,6 +54,7 @@ class ClienteModelTest extends TestCase
                 $this->d3 = null;
                 $this->d4 = null;
                 $this->descuentos_modified = false;
+                $this->codgrupo_descuento = null;
             }
             public function delete()
             {
@@ -200,6 +201,39 @@ class ClienteModelTest extends TestCase
         $this->assertFalse($this->model->test());
     }
 
+    public function testTestRejectsNullCodgrupoDescuento(): void
+    {
+        $this->prepareValidCliente();
+        $this->model->codgrupo_descuento = null;
+
+        $this->assertFalse(
+            $this->model->test(),
+            'test() must reject a client without a discount group'
+        );
+    }
+
+    public function testTestRejectsEmptyCodgrupoDescuento(): void
+    {
+        $this->prepareValidCliente();
+        $this->model->codgrupo_descuento = '';
+
+        $this->assertFalse(
+            $this->model->test(),
+            'test() must reject an empty discount group code'
+        );
+    }
+
+    public function testTestAcceptsExplicitCodgrupoDescuento(): void
+    {
+        $this->prepareValidCliente();
+        $this->model->codgrupo_descuento = '000000';
+
+        $this->assertTrue(
+            $this->model->test(),
+            'test() must accept an explicitly selected discount group'
+        );
+    }
+
     public function testApplyGroupDiscountsCopiesValuesAndClearsFlag(): void
     {
         $this->model->d1 = 99.00;
@@ -268,6 +302,7 @@ class ClienteModelTest extends TestCase
         $this->model->debaja = false;
         $this->model->diaspago = '';
         $this->model->codgrupo = '000001';
+        $this->model->codgrupo_descuento = '000000';
 
         $this->assertTrue($this->model->test());
     }
@@ -308,6 +343,7 @@ class ClienteModelTest extends TestCase
         $this->model->debaja = false;
         $this->model->diaspago = '';
         $this->model->codgrupo = '000001';
+        $this->model->codgrupo_descuento = '000000';
 
         $this->assertTrue($this->model->test());
     }
@@ -323,6 +359,7 @@ class ClienteModelTest extends TestCase
         $this->model->fechabaja = null;
         $this->model->diaspago = '';
         $this->model->codgrupo = '000001';
+        $this->model->codgrupo_descuento = '000000';
 
         $this->model->test();
 
@@ -341,6 +378,7 @@ class ClienteModelTest extends TestCase
         $this->model->fechabaja = '01-01-2020';
         $this->model->diaspago = '';
         $this->model->codgrupo = '000001';
+        $this->model->codgrupo_descuento = '000000';
 
         $this->model->test();
 
@@ -357,6 +395,7 @@ class ClienteModelTest extends TestCase
         $this->model->debaja = false;
         $this->model->diaspago = '1,15,31,0,50';
         $this->model->codgrupo = '000001';
+        $this->model->codgrupo_descuento = '000000';
 
         $this->model->test();
 
@@ -373,6 +412,7 @@ class ClienteModelTest extends TestCase
         $this->model->debaja = false;
         $this->model->diaspago = null;
         $this->model->codgrupo = '000001';
+        $this->model->codgrupo_descuento = '000000';
 
         $this->assertTrue($this->model->test());
         $this->assertNull($this->model->diaspago);
@@ -388,11 +428,61 @@ class ClienteModelTest extends TestCase
         $this->model->debaja = false;
         $this->model->diaspago = '';
         $this->model->codgrupo = '000001';
+        $this->model->codgrupo_descuento = '000000';
 
         $this->model->test();
 
         $this->assertStringNotContainsString('<script>', $this->model->nombre);
         $this->assertStringNotContainsString('<b>', $this->model->cifnif);
+    }
+
+    public function testCountByGroupReturnsReferencingClientCount(): void
+    {
+        $cliente = $this->makeClienteWithStubbedDb([['total' => 3]]);
+
+        $this->assertSame(3, $cliente->countByGroup('000001'));
+
+        $stub = $this->readDbStub($cliente);
+        $this->assertSame(1, $stub->selectCalls, 'countByGroup() must issue exactly one SELECT');
+        $this->assertStringContainsString('COUNT(*)', $stub->lastSql);
+        $this->assertStringContainsString('WHERE codgrupo =', $stub->lastSql);
+        $this->assertStringNotContainsString(
+            'codgrupo_descuento',
+            $stub->lastSql,
+            'countByGroup() must count the client group column, never the discount column'
+        );
+    }
+
+    public function testCountByDiscountGroupReturnsReferencingClientCount(): void
+    {
+        $cliente = $this->makeClienteWithStubbedDb([['total' => 5]]);
+
+        $this->assertSame(5, $cliente->countByDiscountGroup('000000'));
+
+        $stub = $this->readDbStub($cliente);
+        $this->assertSame(1, $stub->selectCalls, 'countByDiscountGroup() must issue exactly one SELECT');
+        $this->assertStringContainsString('COUNT(*)', $stub->lastSql);
+        $this->assertStringContainsString('WHERE codgrupo_descuento =', $stub->lastSql);
+    }
+
+    public function testCountByGroupReturnsZeroWhenNoRows(): void
+    {
+        $cliente = $this->makeClienteWithStubbedDb([]);
+
+        $this->assertSame(0, $cliente->countByGroup('000001'));
+    }
+
+    public function testAssignOrphanClientsToDiscountGroupIssuesNullUpdate(): void
+    {
+        $cliente = $this->makeClienteWithStubbedDb([]);
+
+        $this->assertTrue($cliente->assignOrphanClientsToDiscountGroup('000000'));
+
+        $stub = $this->readDbStub($cliente);
+        $this->assertSame(1, $stub->execCalls, 'assignOrphanClientsToDiscountGroup() must issue exactly one UPDATE');
+        $this->assertStringContainsString('UPDATE clientes', $stub->lastExecSql);
+        $this->assertStringContainsString("SET codgrupo_descuento = '000000'", $stub->lastExecSql);
+        $this->assertStringContainsString('WHERE codgrupo_descuento IS NULL', $stub->lastExecSql);
     }
 
     /**
@@ -410,8 +500,10 @@ class ClienteModelTest extends TestCase
     {
         $stub = new class($selectResult) {
             public string $lastSql = '';
+            public string $lastExecSql = '';
             public array $selectResult;
             public int $selectCalls = 0;
+            public int $execCalls = 0;
 
             public function __construct(array $selectResult)
             {
@@ -423,6 +515,18 @@ class ClienteModelTest extends TestCase
                 $this->lastSql = $sql;
                 $this->selectCalls++;
                 return $this->selectResult;
+            }
+
+            public function exec(string $sql, $transaction = null, array $params = [], bool $batch = false)
+            {
+                $this->lastExecSql = $sql;
+                $this->execCalls++;
+                return true;
+            }
+
+            public function var2str($val)
+            {
+                return is_null($val) ? 'NULL' : "'" . $val . "'";
             }
         };
 
@@ -492,9 +596,7 @@ class ClienteModelTest extends TestCase
 
         $cliente->table_has_rows();
 
-        $ref = new \ReflectionProperty(\FSFramework\model\cliente::class, 'db');
-        $ref->setAccessible(true);
-        $stub = $ref->getValue($cliente);
+        $stub = $this->readDbStub($cliente);
 
         $this->assertSame(1, $stub->selectCalls, 'table_has_rows() must call db->select() exactly once');
         $this->assertStringContainsString(
@@ -502,6 +604,36 @@ class ClienteModelTest extends TestCase
             $stub->lastSql,
             'table_has_rows() must issue a SELECT that targets the clientes table'
         );
+    }
+
+    /**
+     * Populate the model with the minimum valid data, including the
+     * mandatory client and discount groups, so test() can reach the
+     * assertion under test.
+     */
+    private function prepareValidCliente(): void
+    {
+        $this->model->codcliente = '000001';
+        $this->model->nombre = 'Test';
+        $this->model->razonsocial = 'Test';
+        $this->model->cifnif = '';
+        $this->model->observaciones = '';
+        $this->model->debaja = false;
+        $this->model->diaspago = '';
+        $this->model->codgrupo = '000001';
+        $this->model->codgrupo_descuento = '000000';
+    }
+
+    /**
+     * Read the stubbed db handle out of a cliente instance built by
+     * makeClienteWithStubbedDb().
+     */
+    private function readDbStub(object $cliente): object
+    {
+        $ref = new \ReflectionProperty(\FSFramework\model\cliente::class, 'db');
+        $ref->setAccessible(true);
+
+        return $ref->getValue($cliente);
     }
 
     private function makeClienteFromData(array $data): object
