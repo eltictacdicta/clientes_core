@@ -3,25 +3,31 @@
 ## Purpose
 
 Source of truth spec for the `discount-groups` domain inside the
-`clientes_core` plugin. This spec covers the `grupo_clientes` entity,
-its discount fields (`d1`–`d4`), validation constraints, cascade
-semantics, and the default "Personalizado" group that serves as the
-mandatory default for all clients.
+`clientes_core` plugin. This spec covers the `grupo_descuentos` entity
+(stored in `gruposdescuentos`, keyed by `codgrupo_descuento`), its
+discount fields (`d1`–`d4`), validation constraints, cascade semantics,
+and the default "Personalizado" discount group that serves as the
+mandatory discount default for all clients. It is distinct from the
+`grupo_clientes` client group (stored in `gruposclientes`, keyed by
+`codgrupo`), whose default is `'000001'` "General".
 
 ## Domain context
 
-The `grupo_clientes` model (declared in
-`plugins/clientes_core/model/core/grupo_clientes.php`) persists to
-the `gruposclientes` DB table. Each group defines four discount
-percentages (`d1`–`d4`) stored as `decimal(5,2)` with values between
-0.00 and 100.00 inclusive. These discounts are inherited by client
-records and form a cascading chain for price calculation (D1 applies
-to base, D2 to D1's result, etc.).
+The `grupo_descuentos` model (declared in
+`plugins/clientes_core/model/core/grupo_descuentos.php`) persists to
+the `gruposdescuentos` DB table, keyed by `codgrupo_descuento`. Each
+group defines four discount percentages (`d1`–`d4`) stored as
+`decimal(5,2)` with values between 0.00 and 100.00 inclusive. These
+discounts are inherited by client records via `clientes.codgrupo_descuento`
+and form a cascading chain for price calculation (D1 applies to base,
+D2 to D1's result, etc.).
 
-A default group "Personalizado" (code `000000`, d1–d4 = 0.00) is
-created during plugin migration and assigned to all existing clients
-without a group. This group is mandatory and cannot be deleted through
-the UI.
+A default discount group "Personalizado" (code `000000`, d1–d4 = 0.00)
+is created during plugin migration and assigned to all existing clients
+without a discount group. This group is the mandatory discount default
+and cannot be deleted while any `clientes` row references it as
+`codgrupo_descuento`. It is never assigned to `clientes.codgrupo`; the
+client-group default is `'000001'` "General".
 
 ## Requirements
 
@@ -100,22 +106,28 @@ the four new columns alongside existing group fields.
 
 ### Requirement: Default "Personalizado" group
 
-A default group named "Personalizado" with `d1–d4 = 0.00` SHALL be
-created during plugin migration. This group serves as the mandatory
-default for all clients. It SHALL NOT be deletable through the UI.
+A default discount group named "Personalizado" with `d1–d4 = 0.00` SHALL
+be created during plugin migration with the deterministic code `'000000'`
+in `gruposdescuentos`. This group serves as the mandatory discount default
+for all clients. It SHALL NOT be assigned to, or referenced by, the
+client-group column `codgrupo`. It SHALL NOT be deletable while any
+`clientes` row references it as `codgrupo_descuento`.
 
 #### Scenario: Personalizado group is created on migration
 
 - GIVEN the plugin is being upgraded
 - WHEN the migration runs
-- THEN a group with `nombre = 'Personalizado'` and `d1–d4 = 0.00` exists
-- AND the group code is deterministic (e.g., '000000' or next available)
+- THEN a `grupo_descuentos` row with `codgrupo_descuento = '000000'`,
+  `nombre = 'Personalizado'` and `d1–d4 = 0.00` exists
+- AND the group code is deterministic: `'000000'`
+- AND no `clientes.codgrupo` value is set to `'000000'`
 
-#### Scenario: Personalizado group cannot be deleted
+#### Scenario: Personalizado group cannot be deleted while in use
 
-- GIVEN the "Personalizado" group exists
-- WHEN a user attempts to delete it
-- THEN the deletion is prevented
-- AND an error message indicates this is the default group
+- GIVEN the "Personalizado" discount group exists
+- AND at least one `clientes` row has `codgrupo_descuento = '000000'`
+- WHEN a delete is requested for `'000000'`
+- THEN the deletion is refused
+- AND an error message is reported
 
-<!-- Source of truth. Last updated: 2026-07-26. Created from changes/clientes-descuentos-grupo/specs/discount-groups/spec.md. -->
+<!-- Source of truth. Last updated: 2026-09-22. Merged from changes/cliente-form-compartido-grupos-obligatorios/specs/discount-groups/spec.md. -->
