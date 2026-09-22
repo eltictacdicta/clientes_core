@@ -21,6 +21,7 @@ require_once dirname(__DIR__) . '/extras/clientes_controller.php';
 require_once dirname(__DIR__) . '/model/core/grupo_descuentos.php';
 
 use FSFramework\model\grupo_descuentos;
+use FSFramework\Plugins\clientes_core\ClienteForm;
 
 /**
  * Controlador del detalle de un cliente.
@@ -123,52 +124,10 @@ class ventas_cliente extends clientes_controller
             return;
         }
 
-        $this->cliente->nombre = filter_input(INPUT_POST, 'nombre') ?? $this->cliente->nombre;
-        $this->cliente->razonsocial = filter_input(INPUT_POST, 'razonsocial') ?? $this->cliente->razonsocial;
-        $this->cliente->tipoidfiscal = filter_input(INPUT_POST, 'tipoidfiscal') ?? $this->cliente->tipoidfiscal;
-        $this->cliente->cifnif = filter_input(INPUT_POST, 'cifnif') ?? $this->cliente->cifnif;
-        $this->cliente->telefono1 = filter_input(INPUT_POST, 'telefono1') ?? $this->cliente->telefono1;
-        $this->cliente->telefono2 = filter_input(INPUT_POST, 'telefono2') ?? $this->cliente->telefono2;
-        $this->cliente->fax = filter_input(INPUT_POST, 'fax') ?? $this->cliente->fax;
-        $this->cliente->email = filter_input(INPUT_POST, 'email') ?? $this->cliente->email;
-        $this->cliente->web = filter_input(INPUT_POST, 'web') ?? $this->cliente->web;
-        $this->cliente->coddivisa = !empty(filter_input(INPUT_POST, 'coddivisa')) ? filter_input(INPUT_POST, 'coddivisa') : null;
-        $codgrupo = filter_input(INPUT_POST, 'codgrupo');
-        $this->cliente->codgrupo = !empty($codgrupo) ? $codgrupo : null;
-        $this->cliente->regimeniva = filter_input(INPUT_POST, 'regimeniva') ?? $this->cliente->regimeniva;
-        $this->cliente->recargo = filter_input(INPUT_POST, 'recargo') === '1';
-        $this->cliente->personafisica = filter_input(INPUT_POST, 'personafisica') === '1';
-        $this->cliente->diaspago = filter_input(INPUT_POST, 'diaspago') ?? $this->cliente->diaspago;
-        $this->cliente->observaciones = filter_input(INPUT_POST, 'observaciones') ?? $this->cliente->observaciones;
-        $this->cliente->d1 = filter_input(INPUT_POST, 'd1') !== null ? (float) filter_input(INPUT_POST, 'd1') : $this->cliente->d1;
-        $this->cliente->d2 = filter_input(INPUT_POST, 'd2') !== null ? (float) filter_input(INPUT_POST, 'd2') : $this->cliente->d2;
-        $this->cliente->d3 = filter_input(INPUT_POST, 'd3') !== null ? (float) filter_input(INPUT_POST, 'd3') : $this->cliente->d3;
-        $this->cliente->d4 = filter_input(INPUT_POST, 'd4') !== null ? (float) filter_input(INPUT_POST, 'd4') : $this->cliente->d4;
-
-        $codgrupoDescuento = filter_input(INPUT_POST, 'codgrupo_descuento');
-        $this->cliente->codgrupo_descuento = !empty($codgrupoDescuento) ? $codgrupoDescuento : null;
-
-        if ($this->cliente->codgrupo_descuento) {
-            $grupoDescModel = new grupo_descuentos();
-            $grupoDesc = $grupoDescModel->get($this->cliente->codgrupo_descuento);
-            if ($grupoDesc) {
-                $modified = false;
-                foreach (['d1', 'd2', 'd3', 'd4'] as $field) {
-                    $clientVal = $this->cliente->{$field} !== null ? round((float) $this->cliente->{$field}, 2) : null;
-                    $groupVal = $grupoDesc->{$field} !== null ? round((float) $grupoDesc->{$field}, 2) : null;
-                    if ($clientVal !== $groupVal) {
-                        $modified = true;
-                        break;
-                    }
-                }
-                $this->cliente->descuentos_modified = $modified;
-            }
-        }
-
-        $debaja = filter_input(INPUT_POST, 'debaja');
-        if ($debaja !== null) {
-            $this->cliente->debaja = $debaja === '1';
-        }
+        // Single shared authority for field mapping and the descuentos diff.
+        // It never writes a fallback group code: an empty selection stays null
+        // and cliente::test() rejects it.
+        ClienteForm::apply($this->cliente, $this->request->request->all());
 
         if ($this->cliente->save()) {
             $this->new_message('Cliente guardado correctamente.');

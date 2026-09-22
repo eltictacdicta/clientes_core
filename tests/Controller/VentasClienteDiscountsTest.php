@@ -25,6 +25,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 use FSFramework\Security\CsrfManager;
+use FSFramework\Plugins\clientes_core\ClienteForm;
 
 #[RunTestsInSeparateProcesses]
 #[PreserveGlobalState(false)]
@@ -410,7 +411,12 @@ final class VentasClienteDiscountsTest extends TestCase
      */
     private function invokeSaveCliente(object $controller, array $postData): void
     {
-        // Apply POST data to cliente the same way save_cliente() does
+        // Mapping stays local to this harness. `ClienteForm::apply()` resolves the
+        // discount group through FSFramework\model\grupo_descuentos, and
+        // controller/ventas_cliente.php hard-require_once's that real model file,
+        // so the stub can never win the class lookup (class_alias cannot override
+        // an already-declared class). Delegating apply() here would read the live
+        // DB and make these tests non-deterministic.
         $c = $controller->cliente;
         $c->nombre = $postData['nombre'] ?? $c->nombre;
         $c->razonsocial = $postData['razonsocial'] ?? $c->razonsocial;
@@ -437,21 +443,13 @@ final class VentasClienteDiscountsTest extends TestCase
         $codgrupoDescuento = $postData['codgrupo_descuento'] ?? null;
         $c->codgrupo_descuento = !empty($codgrupoDescuento) ? $codgrupoDescuento : null;
 
-        // Discount diff detection logic (from save_cliente) — uses grupo_descuentos
+        // The diff is a pure function of (cliente, group), so it can be delegated
+        // even though apply() cannot: the harness supplies its own stub group.
+        // This is the single diff implementation, per design 9.6.
         if ($c->codgrupo_descuento) {
-            $grupoDescModel = new \grupo_descuentos();
-            $grupoDesc = $grupoDescModel->get($c->codgrupo_descuento);
+            $grupoDesc = (new \grupo_descuentos())->get($c->codgrupo_descuento);
             if ($grupoDesc) {
-                $modified = false;
-                foreach (['d1', 'd2', 'd3', 'd4'] as $field) {
-                    $clientVal = $c->{$field} !== null ? round((float) $c->{$field}, 2) : null;
-                    $groupVal = $grupoDesc->{$field} !== null ? round((float) $grupoDesc->{$field}, 2) : null;
-                    if ($clientVal !== $groupVal) {
-                        $modified = true;
-                        break;
-                    }
-                }
-                $c->descuentos_modified = $modified;
+                $c->descuentos_modified = ClienteForm::computeDescuentosModified($c, $grupoDesc);
             }
         }
 
@@ -919,6 +917,32 @@ final class VentasClienteDiscountsTest extends TestCase
             "/codgrupo[^;]*'000000'/",
             $source,
             'save_cliente() must not assign the discount code to codgrupo'
+        );
+    }
+
+    /**
+     * Mapping and the descuentos diff live in the shared authority:
+     * save_cliente() must delegate to ClienteForm::apply() and must not keep
+     * an independent d1-d4 diff implementation.
+     *
+     * Scenario: shared-client-form -> "Descuentos diff is computed in one place".
+     */
+    #[Test]
+    public function saveClienteDelegatesMappingAndDiffToSharedAuthority(): void
+    {
+        $source = (string) file_get_contents(
+            FS_FOLDER . '/plugins/clientes_core/controller/ventas_cliente.php'
+        );
+
+        $this->assertStringContainsString(
+            'ClienteForm::apply(',
+            $source,
+            'save_cliente() must delegate mapping and diff to ClienteForm::apply()'
+        );
+        $this->assertStringNotContainsString(
+            "['d1', 'd2', 'd3', 'd4']",
+            $source,
+            'the inline d1-d4 diff loop must be removed from the controller'
         );
     }
 

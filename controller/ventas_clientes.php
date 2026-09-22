@@ -19,6 +19,8 @@
 
 require_once dirname(__DIR__) . '/extras/clientes_controller.php';
 
+use FSFramework\Plugins\clientes_core\ClienteForm;
+
 /**
  * Controlador del listado de clientes.
  * Plugin: clientes_core
@@ -252,12 +254,9 @@ class ventas_clientes extends clientes_controller
         $cliente->codcliente = $this->request->request->get('codcliente')
             ?: $this->request->request->get('codigo')
             ?: null;
-        $cliente->nombre = $this->request->request->get('nombre') ?? '';
-        $cliente->razonsocial = $this->request->request->get('razonsocial') ?: $this->request->request->get('nombre') ?? '';
-        $cliente->cifnif = $this->request->request->get('cifnif') ?? '';
-        $cliente->telefono1 = $this->request->request->get('telefono1') ?? '';
-        $cliente->email = $this->request->request->get('email') ?? '';
-        $cliente->codgrupo = !empty($this->request->request->get('codgrupo')) ? $this->request->request->get('codgrupo') : null;
+
+        // Same authority as the edit page: one mapping, one descuentos diff.
+        ClienteForm::apply($cliente, $this->request->request->all());
 
         if ($cliente->save()) {
             return $cliente;
