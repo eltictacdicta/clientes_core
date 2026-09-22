@@ -28,45 +28,33 @@ use PHPUnit\Framework\TestCase;
  *
  * === Test seam: autoloader-based fake injection ===
  *
- * Init::upgrade() is a static method that consumes two global
- * collaborators — \FSFramework\model\cliente and \fs_settings —
- * via the production-side `use \FSFramework\model\cliente;` import
- * and a bare `new \fs_settings()`. Neither is constructor-injected
- * (the seeder has no instance, no DI container).
+ * Init::upgrade() is a static method that consumes global
+ * collaborators — \FSFramework\model\cliente,
+ * \FSFramework\model\grupo_clientes,
+ * \FSFramework\model\grupo_descuentos and \fs_settings — via the
+ * production-side `use` imports and bare `new` calls. None is
+ * constructor-injected (the seeder has no instance, no DI container).
  *
  * To exercise the seeder's branches without a real DB and without
  * a real INI file on disk, this test class:
  *
  *   1. Depends on PHPUnit's `processIsolation` being enabled (see
  *      plugins/clientes_core/phpunit.xml, `processIsolation="true"`).
- *      Without process isolation, the sibling test
- *      `ClienteModelTest` eagerly requires the production
- *      `plugins/clientes_core/model/core/cliente.php` in its
- *      setUp(), and once a class is loaded PHP does not let
- *      another file redefine the same FQCN. The prepended
- *      autoloader below can only intercept a *first-time* load
- *      of \FSFramework\model\cliente, which requires a fresh
- *      process. The InitUpgradeTest is small enough (6 tests)
- *      that the per-test process overhead is acceptable.
+ *      Without process isolation, a sibling test eagerly requires the
+ *      production cliente.php, and once a class is loaded PHP does not
+ *      let another file redefine the same FQCN.
  *
- *   2. Registers a PREPENDED autoloader in setUp() that, when
- *      asked for either `\FSFramework\model\cliente` or
- *      `fs_settings`, loads the in-memory fakes from
- *      `tests/Fixtures/InitUpgradeFakes.php`. The fakes mirror
- *      the production API surface that the seeder consumes
- *      (cliente::table_has_rows, cliente::save,
- *      fs_settings::get/set/save) and expose static
- *      counters/logs the assertions read.
+ *   2. Registers a PREPENDED autoloader in setUp() that loads the
+ *      in-memory fakes from tests/Fixtures/InitUpgradeFakes.php.
  *
- *   3. The fakes use the same FQCN as the production classes.
- *      The autoloader loads them only when the class is first
- *      requested; thereafter the class is fixed for the rest
- *      of the process.
+ *   3. The fakes use the same FQCN as the production classes. The
+ *      autoloader loads them only when the class is first requested;
+ *      thereafter the class is fixed for the rest of the process.
  *
- * The autoloader is idempotent (registered via a static guard)
- * and lives for the duration of each separate process. No global
- * state leaks between tests.
- *
+ * Because process isolation reports any child-process stderr output as
+ * a test error, the tests that intentionally exercise a failure branch
+ * (which the seeder reports via error_log) redirect the error_log
+ * destination to /dev/null for the duration of the call.
  */
 #[\PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses]
 #[\PHPUnit\Framework\Attributes\PreserveGlobalState(false)]
@@ -74,6 +62,9 @@ class InitUpgradeTest extends TestCase
 {
     /** Guard against registering the autoloader twice in the same process. */
     private static bool $autoloaderRegistered = false;
+
+    /** error_log destination captured before suppression. */
+    private static string|false $previousErrorLog = false;
 
     protected function setUp(): void
     {
@@ -93,6 +84,7 @@ class InitUpgradeTest extends TestCase
         // Reset the fakes' static observation counters / logs.
         \FSFramework\model\cliente::resetStatic();
         \FSFramework\model\grupo_clientes::resetStatic();
+        \FSFramework\model\grupo_descuentos::resetStatic();
         \fs_settings::resetStatic();
     }
 
@@ -108,6 +100,7 @@ class InitUpgradeTest extends TestCase
             }
             if ($class === 'FSFramework\\model\\cliente'
                 || $class === 'FSFramework\\model\\grupo_clientes'
+                || $class === 'FSFramework\\model\\grupo_descuentos'
                 || $class === 'fs_settings') {
                 require_once __DIR__ . '/Fixtures/InitUpgradeFakes.php';
                 return class_exists($class, false);
@@ -119,9 +112,44 @@ class InitUpgradeTest extends TestCase
     }
 
     /**
+     * Silence error_log for the duration of a call that intentionally
+     * triggers the seeder's failure branch. Process isolation treats
+     * any stderr output as a test error, and the failure path is
+     * deliberately exercised here.
+     */
+    private static function suppressErrorLog(): void
+    {
+        self::$previousErrorLog = ini_get('error_log');
+        ini_set('error_log', '/dev/null');
+    }
+
+    private static function restoreErrorLog(): void
+    {
+        ini_set('error_log', self::$previousErrorLog === false ? '' : self::$previousErrorLog);
+    }
+
+    /**
+     * Seed the fakes so the two default groups already exist.
+     */
+    private static function seedDefaultGroups(): void
+    {
+        \FSFramework\model\grupo_clientes::$storedGroups = [
+            '000001' => ['codgrupo' => '000001', 'nombre' => 'General', 'codtarifa' => null],
+        ];
+        \FSFramework\model\grupo_descuentos::$storedGroups = [
+            '000000' => [
+                'codgrupo_descuento' => '000000',
+                'nombre' => 'Personalizado',
+                'd1' => 0.00,
+                'd2' => 0.00,
+                'd3' => 0.00,
+                'd4' => 0.00,
+            ],
+        ];
+    }
+
+    /**
      * Case 1 — empty table + no flag → insert + set flag.
-     *
-     * Spec: default-client-on-activation#Scenario:Empty install triggers the seed.
      */
     public function test_seeds_default_client_when_table_empty_and_flag_unset(): void
     {
@@ -137,7 +165,7 @@ class InitUpgradeTest extends TestCase
         $this->assertCount(
             2,
             \FSFramework\model\cliente::$instances,
-            'cliente must be instantiated for the seeder and the orphan migration'
+            'cliente must be instantiated for the seed and the backfill'
         );
         $this->assertSame(
             'Cliente por defecto',
@@ -145,33 +173,44 @@ class InitUpgradeTest extends TestCase
             'Seeded cliente must have the canonical default name'
         );
         $this->assertSame(
+            '000001',
+            \FSFramework\model\cliente::$instances[0]->codgrupo,
+            'Seeded cliente must reference the General client group'
+        );
+        $this->assertSame(
+            '000000',
+            \FSFramework\model\cliente::$instances[0]->codgrupo_descuento,
+            'Seeded cliente must reference the Personalizado discount group'
+        );
+        $this->assertSame(
             '1',
             $GLOBALS['config2']['clientes_core_default_seeded'] ?? null,
             'Flag must be set to the string "1"'
         );
         $this->assertSame(
-            2,
+            3,
             \fs_settings::$saveCalls,
-            'fs_settings::save() must be called for the default seed flag and the discount migration flag'
+            'fs_settings::save() must run for the default seed, the legacy flag and the backfill flag'
         );
         $this->assertSame(
             1,
             \FSFramework\model\cliente::$table_has_rows_calls,
             'table_has_rows() must be called exactly once to detect the empty table'
         );
+        $this->assertSame(1, \FSFramework\model\grupo_clientes::$saveCalls);
+        $this->assertSame(1, \FSFramework\model\grupo_descuentos::$saveCalls);
     }
 
     /**
-     * Case 2 — flag already set and table non-empty → no insert, no save.
-     *
-     * Spec: default-client-on-activation#Scenario:Re-activation after deactivation is a no-op.
+     * Case 2 — every flag already set and every group present → no writes.
      */
-    public function test_is_noop_when_flag_already_set(): void
+    public function test_is_noop_when_all_flags_already_set(): void
     {
         $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
         $GLOBALS['config2']['clientes_core_discounts_migrated'] = '1';
+        $GLOBALS['config2']['clientes_core_discount_group_required'] = '1';
         \FSFramework\model\cliente::$table_has_rows_result = true;
-        \FSFramework\model\grupo_clientes::$table_has_rows_result = true;
+        self::seedDefaultGroups();
 
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 
@@ -180,6 +219,10 @@ class InitUpgradeTest extends TestCase
             \FSFramework\model\cliente::$saveCalls,
             'save() must not run when the table already has rows'
         );
+        $this->assertSame(0, \FSFramework\model\grupo_clientes::$saveCalls);
+        $this->assertSame(0, \FSFramework\model\grupo_descuentos::$saveCalls);
+        $this->assertSame(0, \FSFramework\model\cliente::$assignOrphanCalls);
+        $this->assertSame(0, \FSFramework\model\cliente::$assignDiscountOrphanCalls);
         $this->assertSame(
             '1',
             $GLOBALS['config2']['clientes_core_default_seeded'] ?? null,
@@ -188,11 +231,9 @@ class InitUpgradeTest extends TestCase
     }
 
     /**
-     * Case 3 — non-empty table + no flag → no insert, but flag IS set.
-     *
-     * Spec: default-client-on-activation#Scenario:Non-empty install skips the insert and still sets the flag.
+     * Case 3 — non-empty table + no flag → no insert, but flags ARE set.
      */
-    public function test_is_noop_when_table_nonempty_and_sets_flag(): void
+    public function test_is_noop_when_table_nonempty_and_sets_flags(): void
     {
         \FSFramework\model\cliente::$table_has_rows_result = true;
 
@@ -201,7 +242,7 @@ class InitUpgradeTest extends TestCase
         $this->assertCount(
             2,
             \FSFramework\model\cliente::$instances,
-            'cliente must be instantiated for table_has_rows() and orphan migration'
+            'cliente must be instantiated for table_has_rows() and the backfill'
         );
         $this->assertSame(
             0,
@@ -213,19 +254,27 @@ class InitUpgradeTest extends TestCase
             $GLOBALS['config2']['clientes_core_default_seeded'] ?? null,
             'Flag must be set to "1" so future activations short-circuit'
         );
+        $this->assertSame(
+            '1',
+            $GLOBALS['config2']['clientes_core_discount_group_required'] ?? null,
+            'The mandatory-group backfill flag must be set'
+        );
     }
 
     /**
      * Case 4 — DB error during save is swallowed.
-     *
-     * Spec: default-client-on-activation#Scenario:DB error during seed does not break activation.
      */
     public function test_swallows_db_error_during_save(): void
     {
         \FSFramework\model\cliente::$table_has_rows_result = false;
         \FSFramework\model\cliente::$saveException = new \RuntimeException('boom');
 
-        \FSFramework\Plugins\clientes_core\Init::upgrade();
+        self::suppressErrorLog();
+        try {
+            \FSFramework\Plugins\clientes_core\Init::upgrade();
+        } finally {
+            self::restoreErrorLog();
+        }
 
         $this->assertSame(
             1,
@@ -238,32 +287,24 @@ class InitUpgradeTest extends TestCase
             'Default seed flag must NOT be set when the save throws (so the next activation retries)'
         );
         $this->assertSame(
-            1,
+            2,
             \fs_settings::$saveCalls,
-            'fs_settings::save() must still run for the discount migration when the seeder failed'
+            'fs_settings::save() must still run for the legacy flag and the backfill flag'
         );
         $this->assertSame(
             '1',
             $GLOBALS['config2']['clientes_core_discounts_migrated'] ?? null,
             'Discount migration flag must be set even when the default seed save throws'
         );
+        $this->assertSame(
+            '1',
+            $GLOBALS['config2']['clientes_core_discount_group_required'] ?? null,
+            'Backfill flag must be set even when the default seed save throws'
+        );
     }
 
     /**
      * Case 5 (bonus) — cold start, table does not yet exist.
-     *
-     * On a brand-new install `clientes` does not exist when
-     * `runPluginUpgrade` calls `Init::upgrade()` (runPluginUpgrade
-     * runs before `ensurePluginTables`). The `cliente`
-     * constructor's `parent::__construct('clientes')` calls
-     * `check_table()` which auto-creates the table from the
-     * plugin's XML schema. The seeder then continues to insert
-     * the default row.
-     *
-     * The fake's constructor intentionally skips the parent
-     * `fs_model::__construct('clientes')` to keep the test DB-free;
-     * that is functionally equivalent to the production path once
-     * `check_table()` has succeeded.
      */
     public function test_cold_start_auto_creates_table(): void
     {
@@ -274,7 +315,7 @@ class InitUpgradeTest extends TestCase
         $this->assertCount(
             2,
             \FSFramework\model\cliente::$instances,
-            'cliente must be instantiated for the seeder and orphan migration during cold start'
+            'cliente must be instantiated for the seed and the backfill during cold start'
         );
         $this->assertSame(
             1,
@@ -290,11 +331,6 @@ class InitUpgradeTest extends TestCase
 
     /**
      * Case 6 (bonus) — set and save are called in the right order.
-     *
-     * `fs_settings::set('clientes_core_default_seeded', '1')` must
-     * be called before `fs_settings::save()` (which persists the
-     * whole `config2` array). If `set` ran after `save`, the
-     * persisted file would be missing the flag.
      */
     public function test_sets_flag_via_set_and_save(): void
     {
@@ -330,60 +366,206 @@ class InitUpgradeTest extends TestCase
         );
     }
 
-    public function test_migrates_discounts_and_assigns_orphan_clients(): void
+    /**
+     * Creates both default groups and backfills the two orphan columns,
+     * each from its own column.
+     */
+    public function test_creates_default_groups_and_backfills_orphans(): void
     {
         \FSFramework\model\cliente::$table_has_rows_result = true;
         $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
 
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 
-        $this->assertSame(
-            1,
-            \FSFramework\model\grupo_clientes::$saveCalls,
-            'Personalizado group must be created once'
-        );
+        // Client group: '000001' General, never the discount code.
+        $this->assertSame(1, \FSFramework\model\grupo_clientes::$saveCalls);
         $this->assertArrayHasKey(
+            '000001',
+            \FSFramework\model\grupo_clientes::$storedGroups ?? [],
+            'General client group must be stored with code 000001'
+        );
+        $this->assertSame(
+            'General',
+            \FSFramework\model\grupo_clientes::$storedGroups['000001']['nombre']
+        );
+        $this->assertArrayNotHasKey(
             '000000',
             \FSFramework\model\grupo_clientes::$storedGroups ?? [],
-            'Personalizado group must be stored with code 000000'
+            'The discount code 000000 must never be stored as a client group'
         );
-        $personalizado = \FSFramework\model\grupo_clientes::$storedGroups['000000'];
+
+        // Discount group: '000000' Personalizado, d1-d4 = 0.00.
+        $this->assertSame(1, \FSFramework\model\grupo_descuentos::$saveCalls);
+        $this->assertArrayHasKey(
+            '000000',
+            \FSFramework\model\grupo_descuentos::$storedGroups ?? [],
+            'Personalizado discount group must be stored with code 000000'
+        );
+        $personalizado = \FSFramework\model\grupo_descuentos::$storedGroups['000000'];
         $this->assertSame('Personalizado', $personalizado['nombre']);
+        $this->assertSame(0.00, $personalizado['d1']);
+        $this->assertSame(0.00, $personalizado['d4']);
+
+        // Client-group orphan backfill targets 000001.
+        $this->assertSame(1, \FSFramework\model\cliente::$assignOrphanCalls);
+        $this->assertSame(
+            '000001',
+            \FSFramework\model\cliente::$assignOrphanCodgrupo,
+            'Orphan client-group backfill must target 000001'
+        );
+
+        // Discount orphan backfill targets 000000.
+        $this->assertSame(1, \FSFramework\model\cliente::$assignDiscountOrphanCalls);
+        $this->assertSame(
+            '000000',
+            \FSFramework\model\cliente::$assignDiscountOrphanCodgrupo,
+            'Orphan discount-group backfill must target 000000'
+        );
+
+        $this->assertSame(
+            '1',
+            $GLOBALS['config2']['clientes_core_discount_group_required'] ?? null,
+            'Mandatory-group backfill flag must be set'
+        );
+    }
+
+    /**
+     * The new flag gates the backfill independently of the legacy flag.
+     */
+    public function test_new_flag_gates_backfill_independently_of_legacy_flag(): void
+    {
+        \FSFramework\model\cliente::$table_has_rows_result = true;
+        $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
+        $GLOBALS['config2']['clientes_core_discounts_migrated'] = '1';
+
+        \FSFramework\Plugins\clientes_core\Init::upgrade();
+
         $this->assertSame(
             1,
             \FSFramework\model\cliente::$assignOrphanCalls,
-            'Orphan clients must be assigned to Personalizado'
+            'The backfill must still run when only the legacy flag is set'
+        );
+        $this->assertSame('000001', \FSFramework\model\cliente::$assignOrphanCodgrupo);
+        $this->assertSame(1, \FSFramework\model\cliente::$assignDiscountOrphanCalls);
+        $this->assertSame('000000', \FSFramework\model\cliente::$assignDiscountOrphanCodgrupo);
+        $this->assertSame(
+            '1',
+            $GLOBALS['config2']['clientes_core_discount_group_required'] ?? null,
+            'The new flag must be set to "1"'
+        );
+    }
+
+    /**
+     * Re-running the migration is a no-op.
+     */
+    public function test_rerunning_backfill_is_a_noop(): void
+    {
+        \FSFramework\model\cliente::$table_has_rows_result = true;
+        $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
+        $GLOBALS['config2']['clientes_core_discounts_migrated'] = '1';
+        $GLOBALS['config2']['clientes_core_discount_group_required'] = '1';
+        self::seedDefaultGroups();
+
+        \FSFramework\Plugins\clientes_core\Init::upgrade();
+
+        $this->assertSame(
+            0,
+            \FSFramework\model\grupo_clientes::$saveCalls,
+            'No client group must be re-created when the backfill flag is set'
         );
         $this->assertSame(
-            '000000',
-            \FSFramework\model\cliente::$assignOrphanCodgrupo,
-            'Orphan migration must target group 000000'
+            0,
+            \FSFramework\model\grupo_descuentos::$saveCalls,
+            'No discount group must be re-created when the backfill flag is set'
+        );
+        $this->assertSame(
+            0,
+            \FSFramework\model\cliente::$assignOrphanCalls,
+            'No client-group UPDATE must be issued on a re-run'
+        );
+        $this->assertSame(
+            0,
+            \FSFramework\model\cliente::$assignDiscountOrphanCalls,
+            'No discount-group UPDATE must be issued on a re-run'
+        );
+    }
+
+    /**
+     * R8 — a populated gruposclientes table lacking '000001' still gets
+     * the General default created (the old table_has_rows() early return
+     * is removed).
+     */
+    public function test_ensure_default_client_group_on_populated_table_lacking_default(): void
+    {
+        \FSFramework\model\cliente::$table_has_rows_result = true;
+        $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
+        $GLOBALS['config2']['clientes_core_discounts_migrated'] = '1';
+        $GLOBALS['config2']['clientes_core_discount_group_required'] = '1';
+        \FSFramework\model\grupo_clientes::$storedGroups = [
+            '000002' => ['codgrupo' => '000002', 'nombre' => 'Otro', 'codtarifa' => null],
+        ];
+        \FSFramework\model\grupo_descuentos::$storedGroups = [
+            '000000' => [
+                'codgrupo_descuento' => '000000',
+                'nombre' => 'Personalizado',
+                'd1' => 0.00,
+                'd2' => 0.00,
+                'd3' => 0.00,
+                'd4' => 0.00,
+            ],
+        ];
+
+        \FSFramework\Plugins\clientes_core\Init::upgrade();
+
+        $this->assertArrayHasKey(
+            '000001',
+            \FSFramework\model\grupo_clientes::$storedGroups,
+            'A non-empty table lacking 000001 must still get the General default'
+        );
+        $this->assertSame(
+            'General',
+            \FSFramework\model\grupo_clientes::$storedGroups['000001']['nombre']
+        );
+        $this->assertSame(
+            1,
+            \FSFramework\model\grupo_clientes::$saveCalls,
+            'Exactly the General default must be created'
+        );
+    }
+
+    /**
+     * A failure inside the backfill leaves its flag unset so the next
+     * activation retries, and never breaks activation.
+     */
+    public function test_backfill_failure_leaves_flag_unset_without_breaking_activation(): void
+    {
+        \FSFramework\model\cliente::$table_has_rows_result = true;
+        $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
+        $GLOBALS['config2']['clientes_core_discounts_migrated'] = '1';
+        self::seedDefaultGroups();
+        \FSFramework\model\cliente::$assignDiscountOrphanException = new \RuntimeException('backfill boom');
+
+        self::suppressErrorLog();
+        try {
+            \FSFramework\Plugins\clientes_core\Init::upgrade();
+        } finally {
+            self::restoreErrorLog();
+        }
+
+        $this->assertArrayNotHasKey(
+            'clientes_core_discount_group_required',
+            $GLOBALS['config2'],
+            'The backfill flag must stay unset so the next activation retries'
+        );
+        $this->assertSame(
+            '1',
+            $GLOBALS['config2']['clientes_core_default_seeded'] ?? null,
+            'Activation must not break: earlier blocks keep their flags'
         );
         $this->assertSame(
             '1',
             $GLOBALS['config2']['clientes_core_discounts_migrated'] ?? null,
-            'Discount migration flag must be set'
-        );
-    }
-
-    public function test_discount_migration_is_noop_when_flag_already_set(): void
-    {
-        $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
-        $GLOBALS['config2']['clientes_core_discounts_migrated'] = '1';
-        \FSFramework\model\grupo_clientes::$table_has_rows_result = true;
-        \FSFramework\model\cliente::$table_has_rows_result = true;
-
-        \FSFramework\Plugins\clientes_core\Init::upgrade();
-
-        $this->assertSame(
-            0,
-            \FSFramework\model\grupo_clientes::$saveCalls,
-            'No group must be created when discount migration flag is set'
-        );
-        $this->assertSame(
-            0,
-            \FSFramework\model\cliente::$assignOrphanCalls,
-            'No orphan migration must run when discount migration flag is set'
+            'Activation must not break: the legacy flag keeps its value'
         );
     }
 }
