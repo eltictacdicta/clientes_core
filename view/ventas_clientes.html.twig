@@ -257,75 +257,22 @@
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <form action="{{ fsc.url() }}" method="post" x-data="clienteGrupoRequired">
-                {{ csrf_field() }}
-                <input type="hidden" name="action" value="nuevo_cliente"/>
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
                     <h4 class="modal-title">{{ trans('nuevo-cliente') }}</h4>
                 </div>
                 <div class="modal-body">
-                    {% if fsc.grupos|length == 0 %}
-                    <div class="alert alert-warning">
-                        {{ trans('sin-grupos-disponibles') }}
-                    </div>
-                    {% endif %}
-                    <div class="row">
-                        <div class="col-sm-4">
-                            <div class="form-group">
-                                <label>{{ trans('codigo-cliente') }}</label>
-                                <input type="text" name="codcliente" class="form-control" maxlength="6"
-                                    placeholder="Auto" />
-                            </div>
-                        </div>
-                        <div class="col-sm-8">
-                            <div class="form-group">
-                                <label>{{ trans('nombre-cliente') }} *</label>
-                                <input type="text" name="nombre" class="form-control" maxlength="100" required autofocus />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-sm-6">
-                            <div class="form-group">
-                                <label>{{ trans('razonsocial') }}</label>
-                                <input type="text" name="razonsocial" class="form-control" maxlength="100" />
-                            </div>
-                        </div>
-                        <div class="col-sm-6">
-                            <div class="form-group">
-                                <label>{{ trans('cifnif') }}</label>
-                                <input type="text" name="cifnif" class="form-control" maxlength="30" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-sm-4">
-                            <div class="form-group">
-                                <label>{{ trans('telefono1') }}</label>
-                                <input type="text" name="telefono1" class="form-control" maxlength="30" />
-                            </div>
-                        </div>
-                        <div class="col-sm-4">
-                            <div class="form-group">
-                                <label>{{ trans('email') }}</label>
-                                <input type="email" name="email" class="form-control" maxlength="100" />
-                            </div>
-                        </div>
-                        <div class="col-sm-4">
-                            <div class="form-group">
-                                <label>{{ trans('grupo-cliente') }} *</label>
-                                <select name="codgrupo" class="form-control" x-model="codgrupo" required>
-                                    <option value="" disabled selected>— {{ trans('seleccione-grupo') }} —</option>
-                                    {% for g in fsc.grupos %}
-                                    <option value="{{ g.codgrupo }}">{{ g.nombre }}</option>
-                                    {% endfor %}
-                                </select>
-                                <p class="help-block text-danger" x-show="missing()" x-cloak>
-                                    {{ trans('grupo-obligatorio') }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                    {% include '@clientes_core/Cliente/Form.html.twig' with {
+                        mode: 'create',
+                        action_name: 'nuevo_cliente',
+                        grupos: fsc.grupos,
+                        grupos_descuentos: fsc.grupos_descuentos,
+                        regimenes_iva: fsc.regimenes_iva,
+                        id_prefix: 'nuevo_cliente',
+                        show_discounts: true,
+                        show_actions: false,
+                        show_grupos_warning: true
+                    } %}
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default" data-dismiss="modal">{{ trans('cancelar') }}</button>
@@ -348,38 +295,6 @@
             $('#tab_grupos a').tab('show');
         }
     });
-</script>
-
-{# Alpine CSP component registration — nonce'd classic script, idempotent via
-   a window marker so a re-executed script cannot double-register. #}
-<script {{ csp_nonce_attr() }}>
-(function () {
-    if (window.__clientesCoreGrupoRequiredRegistered === true) { return; }
-
-    function registerClienteGrupoRequired() {
-        if (window.__clientesCoreGrupoRequiredRegistered === true) { return; }
-        window.__clientesCoreGrupoRequiredRegistered = true;
-
-        Alpine.data('clienteGrupoRequired', function () {
-            return {
-                codgrupo: '',
-                init: function () {
-                    var select = this.$el.querySelector('select[name="codgrupo"]');
-                    if (select) { this.codgrupo = select.value || ''; }
-                },
-                missing: function () {
-                    return this.codgrupo === '' || this.codgrupo === null;
-                }
-            };
-        });
-    }
-
-    if (window.Alpine) {
-        registerClienteGrupoRequired();
-    } else {
-        document.addEventListener('alpine:init', registerClienteGrupoRequired);
-    }
-})();
 </script>
 
 {{ include('footer.html.twig') }}
