@@ -205,11 +205,12 @@ final class VentasClientesDispatchTest extends TestCase
             public $codgrupo_descuento;
             public static $countByGroupResult = 0;
             public static $lastSavedCodgrupo = null;
+            public static $lastSaved = null;
             public function __construct($data = false) { $this->table_name = "clientes"; }
             public function delete(): bool { return false; }
             public function exists(): bool { return false; }
             public function test(): bool { $this->codcliente = $this->codcliente ?? "000001"; return true; }
-            public function save(): bool { self::$lastSavedCodgrupo = $this->codgrupo; return $this->test(); }
+            public function save(): bool { self::$lastSavedCodgrupo = $this->codgrupo; self::$lastSaved = $this; return $this->test(); }
             public function url(): string { return "index.php?page=ventas_cliente&cod=" . $this->codcliente; }
             public function get_errors(): array { return []; }
             public function search($q = "", $offset = 0) { return []; }
@@ -365,6 +366,34 @@ final class VentasClientesDispatchTest extends TestCase
         $this->assertSame('nuevo_cliente', $result['action']);
         $this->assertNotSame('000000', \cliente::$lastSavedCodgrupo);
         $this->assertNull(\cliente::$lastSavedCodgrupo);
+    }
+
+    /**
+     * The create path maps the whole submission through the shared authority:
+     * fields the old hand-rolled mapping ignored (debaja, diaspago,
+     * observaciones) now reach the persisted entity.
+     *
+     * Scenario: shared-client-form -> "Descuentos diff is computed in one place".
+     */
+    public function testNuevoClienteMapsSubmissionThroughSharedAuthority(): void
+    {
+        \cliente::$lastSaved = null;
+
+        $this->buildController([
+            'action' => 'nuevo_cliente',
+            'nombre' => 'New Client',
+            'codgrupo' => '000001',
+            'debaja' => '1',
+            'diaspago' => '30',
+            'observaciones' => 'alta express',
+        ]);
+        $result = $this->controller->dispatch();
+
+        $this->assertSame('nuevo_cliente', $result['action']);
+        $this->assertNotNull(\cliente::$lastSaved, 'the shared authority path must persist a cliente');
+        $this->assertTrue(\cliente::$lastSaved->debaja);
+        $this->assertSame('30', \cliente::$lastSaved->diaspago);
+        $this->assertSame('alta express', \cliente::$lastSaved->observaciones);
     }
 
     /**
