@@ -1,0 +1,107 @@
+{#
+/**
+ * Shared client form — body.
+ *
+ * Renders the shared client-form content consumed by the create modal and the
+ * edit page: the CSRF field, the hidden `action`/`codcliente` inputs, the
+ * identity field set (`Fields.html.twig`), the discount block
+ * (`Discounts.html.twig`) and the action row.
+ *
+ * The owning `<form>` element stays in the consumer: the create modal must
+ * keep its Bootstrap header/body/footer layout and the edit page owns its own
+ * form element and id (design §5.3, §6.1). The consumer puts
+ * `x-data="clienteGrupoRequired"` on that `<form>` so both mandatory group
+ * selects resolve inside the Alpine component root.
+ *
+ * Every DOM id emitted by this partial chain is namespaced by `id_prefix`
+ * (R7); no consumer/legacy id is hard-coded.
+ *
+ * Context (all optional):
+ *   mode                 'edit' | 'create' (default 'edit')
+ *   cliente              entity to render (default null -> empty entity)
+ *   action_name          hidden `action` value (default 'save_cliente')
+ *   grupos               client-group catalog (default [])
+ *   grupos_descuentos    discount-group catalog (default [])
+ *   regimenes_iva        IVA regime list (default [])
+ *   id_prefix            DOM id prefix, unique per include (default 'cliente')
+ *   allow_delete         render the delete affordance (default false)
+ *   show_discounts       include the discount block (default true)
+ *   show_actions         render the action row (default true)
+ *   show_grupos_warning  render the "no client groups" alert (default false)
+ *   submit_mode          'page' | 'external' (default 'page')
+ *   submit_attrs         extra attributes for the submit button (default {})
+ *   input_class          input density variant (default 'form-control')
+ *   readonly_code        code field readonly (default mode == 'edit')
+ */
+#}
+{% set mode = mode|default('edit') %}
+{% set cliente = cliente|default(null) %}
+{% set action_name = action_name|default('save_cliente') %}
+{% set grupos = grupos|default([]) %}
+{% set grupos_descuentos = grupos_descuentos|default([]) %}
+{% set regimenes_iva = regimenes_iva|default([]) %}
+{% set id_prefix = id_prefix|default('cliente') %}
+{% set allow_delete = allow_delete|default(false) %}
+{% set show_discounts = show_discounts|default(true) %}
+{% set show_actions = show_actions|default(true) %}
+{% set show_grupos_warning = show_grupos_warning|default(false) %}
+{% set submit_mode = submit_mode|default('page') %}
+{% set submit_attrs = submit_attrs|default({}) %}
+{% set input_class = input_class|default('form-control') %}
+{% set readonly_code = readonly_code|default(mode == 'edit') %}
+
+{{ csrf_field() }}
+<input type="hidden" name="action" value="{{ action_name }}" />
+{% if cliente is not null and cliente.codcliente is defined %}
+<input type="hidden" name="codcliente" value="{{ cliente.codcliente }}" />
+{% endif %}
+
+{# Fields inherits the full context so `fsc` reaches the render hook; it is
+   included without `only` on purpose (design §7). #}
+{% include '@clientes_core/Cliente/Fields.html.twig' with {
+    mode: mode,
+    cliente: cliente,
+    grupos: grupos,
+    regimenes_iva: regimenes_iva,
+    id_prefix: id_prefix,
+    readonly_code: readonly_code,
+    input_class: input_class,
+    show_grupos_warning: show_grupos_warning
+} %}
+
+{% if show_discounts %}
+    {% include '@clientes_core/Cliente/Discounts.html.twig' with {
+        cliente: cliente,
+        grupos_descuentos: grupos_descuentos,
+        id_prefix: id_prefix,
+        input_class: input_class
+    } %}
+{% endif %}
+
+{% if show_actions %}
+<div class="row" style="margin-top: 10px;">
+    <div class="col-xs-4">
+        {% if allow_delete %}
+        <button type="button" id="{{ id_prefix }}_btn_delete_cliente" class="btn btn-sm btn-danger">
+            <i class="fa fa-trash fa-fw" aria-hidden="true"></i>
+            <span class="hidden-xs hidden-sm">{{ trans('eliminar') }}</span>
+        </button>
+        {% endif %}
+    </div>
+    <div class="col-xs-8 text-right">
+        {% if mode == 'edit' and cliente is not null and cliente.url is defined %}
+        <a class="btn btn-sm btn-default" href="{{ cliente.url() }}">
+            <i class="fa fa-refresh fa-fw" aria-hidden="true"></i>
+            <span class="hidden-xs hidden-sm">{{ trans('deshacer') }}</span>
+        </a>
+        {% endif %}
+        <button class="btn btn-sm btn-primary"
+            type="{{ submit_mode == 'external' ? 'button' : 'submit' }}"
+            {%- for attr_name, attr_value in submit_attrs %} {{ attr_name }}="{{ attr_value }}"{% endfor %}
+            :disabled="missing()">
+            <i class="fa fa-floppy-o fa-fw" aria-hidden="true"></i>
+            <span class="hidden-xs">{{ trans('guardar') }}</span>
+        </button>
+    </div>
+</div>
+{% endif %}
