@@ -1,0 +1,234 @@
+{#
+/**
+ * Shared client form — identity fields.
+ *
+ * Owns the client identity field set, the `cliente_form_after_main` extension
+ * hook and the idempotent Alpine CSP registration for the mandatory group
+ * selectors. It renders NO address editor: each consumer keeps its own (Q5).
+ *
+ * Consumers MUST put `x-data="clienteGrupoRequired"` on the element that
+ * includes this partial (the <form>), so both group selects resolve inside
+ * the Alpine component root (design §5.3).
+ *
+ * Context (all optional):
+ *   mode                 'edit' | 'create' (default 'edit')
+ *   cliente              entity to render (default null -> empty entity)
+ *   grupos               client-group catalog (default [])
+ *   regimenes_iva        IVA regime list (default [])
+ *   id_prefix            DOM id prefix, unique per include (default 'cliente')
+ *   readonly_code        code field readonly (default mode == 'edit')
+ *   input_class          input density variant (default 'form-control')
+ *   show_grupos_warning  render the "no client groups" alert (default false)
+ */
+#}
+{% set mode = mode|default('edit') %}
+{% set cliente = cliente|default(null) %}
+{% set grupos = grupos|default([]) %}
+{% set regimenes_iva = regimenes_iva|default([]) %}
+{% set id_prefix = id_prefix|default('cliente') %}
+{% set readonly_code = readonly_code|default(mode == 'edit') %}
+{% set input_class = input_class|default('form-control') %}
+{% set show_grupos_warning = show_grupos_warning|default(false) %}
+
+{% if show_grupos_warning and grupos|length == 0 %}
+<div class="alert alert-warning">
+    {{ trans('sin-grupos-disponibles') }}
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label for="{{ id_prefix }}_codcliente">{{ trans('codigo-cliente') }}</label>
+            <input type="text" name="codcliente" id="{{ id_prefix }}_codcliente"
+                value="{{ cliente ? cliente.codcliente : '' }}" class="{{ input_class }}"
+                maxlength="6"{% if readonly_code %} readonly{% else %} placeholder="Auto"{% endif %} />
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="form-group">
+            <label>{{ trans('nombre-cliente') }} *</label>
+            <input type="text" name="nombre" value="{{ cliente ? cliente.nombre : '' }}"
+                class="{{ input_class }}" maxlength="100" required />
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="form-group">
+            <label>{{ trans('razonsocial') }}</label>
+            <input type="text" name="razonsocial" value="{{ cliente ? cliente.razonsocial : '' }}"
+                class="{{ input_class }}" maxlength="100" />
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>{{ trans('cifnif') }}</label>
+            <input type="text" name="cifnif" value="{{ cliente ? cliente.cifnif : '' }}"
+                class="{{ input_class }}" maxlength="30" />
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>{{ trans('tipoidfiscal') }}</label>
+            <input type="text" name="tipoidfiscal" value="{{ cliente ? cliente.tipoidfiscal : '' }}"
+                class="{{ input_class }}" maxlength="25" />
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>{{ trans('persona-fisica') }}</label>
+            <select name="personafisica" class="{{ input_class }}">
+                <option value="1"{% if cliente and cliente.personafisica %} selected{% endif %}>{{ trans('persona-fisica') }}</option>
+                <option value="0"{% if not cliente or not cliente.personafisica %} selected{% endif %}>{{ trans('persona-juridica') }}</option>
+            </select>
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>{{ trans('telefono1') }}</label>
+            <input type="text" name="telefono1" value="{{ cliente ? cliente.telefono1 : '' }}"
+                class="{{ input_class }}" maxlength="30" />
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>{{ trans('telefono2') }}</label>
+            <input type="text" name="telefono2" value="{{ cliente ? cliente.telefono2 : '' }}"
+                class="{{ input_class }}" maxlength="30" />
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>{{ trans('fax') }}</label>
+            <input type="text" name="fax" value="{{ cliente ? cliente.fax : '' }}"
+                class="{{ input_class }}" maxlength="30" />
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>{{ trans('email') }}</label>
+            <input type="email" name="email" value="{{ cliente ? cliente.email : '' }}"
+                class="{{ input_class }}" maxlength="100" />
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('web') }}</label>
+            <input type="url" name="web" value="{{ cliente ? cliente.web : '' }}"
+                class="{{ input_class }}" maxlength="250" />
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label for="{{ id_prefix }}_codgrupo">{{ trans('grupo-cliente') }} *</label>
+            <select name="codgrupo" id="{{ id_prefix }}_codgrupo" class="{{ input_class }}"
+                x-model="codgrupo" required>
+                <option value="" disabled{% if not cliente or not cliente.codgrupo %} selected{% endif %}>— {{ trans('seleccione-grupo') }} —</option>
+                {% for g in grupos %}
+                <option value="{{ g.codgrupo }}"{% if cliente and cliente.codgrupo == g.codgrupo %} selected{% endif %}>
+                    {{ g.nombre }}
+                </option>
+                {% endfor %}
+            </select>
+            <p class="help-block text-danger" id="{{ id_prefix }}_grupo_required"
+                x-show="missing()" x-cloak>
+                {{ trans('grupo-obligatorio') }}
+            </p>
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>{{ trans('regimen-iva') }}</label>
+            <select name="regimeniva" class="{{ input_class }}">
+                {% for regimen in regimenes_iva %}
+                <option value="{{ regimen }}"{% if cliente and cliente.regimeniva == regimen %} selected{% endif %}>
+                    {{ regimen }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>{{ trans('recargo-equivalencia') }}</label>
+            <select name="recargo" class="{{ input_class }}">
+                <option value="0"{% if not cliente or not cliente.recargo %} selected{% endif %}>No</option>
+                <option value="1"{% if cliente and cliente.recargo %} selected{% endif %}>Sí</option>
+            </select>
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>{{ trans('dias-pago') }}</label>
+            <input type="text" name="diaspago" value="{{ cliente ? cliente.diaspago : '' }}"
+                class="{{ input_class }}" maxlength="10" placeholder="1,15,31" />
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>{{ trans('fecha-alta') }}</label>
+            <input type="text" value="{{ cliente ? cliente.fechaalta : '' }}" class="{{ input_class }}" readonly />
+        </div>
+    </div>
+    <div class="col-sm-2">
+        <div class="form-group">
+            <label>{{ trans('cliente-de-baja') }}</label>
+            <select name="debaja" class="{{ input_class }}">
+                <option value="0"{% if not cliente or not cliente.debaja %} selected{% endif %}>No</option>
+                <option value="1"{% if cliente and cliente.debaja %} selected{% endif %}>Sí</option>
+            </select>
+        </div>
+    </div>
+    <div class="col-sm-8">
+        <div class="form-group">
+            <label>{{ trans('observaciones') }}</label>
+            <textarea name="observaciones" class="{{ input_class }}" rows="2">{{ cliente ? cliente.observaciones : '' }}</textarea>
+        </div>
+    </div>
+</div>
+
+{{ render_hook('cliente_form_after_main', {'fsc': fsc|default(null), 'cliente': cliente})|raw }}
+
+{# Alpine CSP component registration — nonce'd classic script, idempotent via
+   a window marker so a re-executed script cannot double-register. #}
+<script {{ csp_nonce_attr() }}>
+(function () {
+    if (window.__clientesCoreGrupoRequiredRegistered === true) { return; }
+
+    function registerClienteGrupoRequired() {
+        if (window.__clientesCoreGrupoRequiredRegistered === true) { return; }
+        window.__clientesCoreGrupoRequiredRegistered = true;
+
+        Alpine.data('clienteGrupoRequired', function () {
+            return {
+                codgrupo: '',
+                codgrupoDescuento: '',
+                init: function () {
+                    var g = this.$el.querySelector('select[name="codgrupo"]');
+                    if (g) { this.codgrupo = g.value || ''; }
+                    var d = this.$el.querySelector('select[name="codgrupo_descuento"]');
+                    if (d) { this.codgrupoDescuento = d.value || ''; }
+                },
+                missing: function () {
+                    return this.codgrupo === '' || this.codgrupo === null
+                        || this.codgrupoDescuento === '' || this.codgrupoDescuento === null;
+                }
+            };
+        });
+    }
+
+    if (window.Alpine) {
+        registerClienteGrupoRequired();
+    } else {
+        document.addEventListener('alpine:init', registerClienteGrupoRequired);
+    }
+})();
+</script>
