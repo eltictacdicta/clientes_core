@@ -462,6 +462,27 @@ final class VentasClienteDiscountsTest extends TestCase
     }
 
     /**
+     * Invoke the production save_cliente() method with the POST body already
+     * attached to the controller's Request.
+     *
+     * Unlike invokeSaveCliente(), this calls the real controller method, so the
+     * edit save path is exercised end to end through ClienteForm::apply().
+     */
+    private function invokeProductionSaveCliente(array $getData, array $postData): object
+    {
+        $controller = $this->createVentasClienteDispatch($getData, $postData);
+
+        $clienteModel = new \cliente();
+        $controller->cliente = $clienteModel->get($getData['cod'] ?? null);
+
+        $method = new \ReflectionMethod($controller, 'save_cliente');
+        $method->setAccessible(true);
+        $method->invoke($controller);
+
+        return $controller;
+    }
+
+    /**
      * Invoke the private change_grupo() method with POST data.
      */
     private function invokeChangeGrupo(object $controller, array $postData): void
@@ -944,6 +965,62 @@ final class VentasClienteDiscountsTest extends TestCase
             $source,
             'the inline d1-d4 diff loop must be removed from the controller'
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // WARNING-3: the edit save path runs through the shared authority
+    // -------------------------------------------------------------------------
+
+    /**
+     * The production edit path maps the submission through ClienteForm::apply().
+     *
+     * This calls ventas_cliente::save_cliente() itself (not the local
+     * re-implementation used elsewhere in this file) with an empty
+     * codgrupo_descuento, so loadDiscountGroup() returns before any DB access.
+     *
+     * Scenarios: shared-client-form -> "Descuentos diff is computed in one
+     * place"; clientes -> "No code path writes the discount code into codgrupo".
+     */
+    #[Test]
+    public function saveClienteEditPathMapsSubmissionThroughSharedAuthority(): void
+    {
+        \cliente::$getReturnData = [
+            'codcliente' => '000001',
+            'nombre' => 'Original Name',
+            'razonsocial' => 'Original Name',
+            'codgrupo' => '000001',
+            'd1' => 0.0,
+            'd2' => 0.0,
+            'd3' => 0.0,
+            'd4' => 0.0,
+            'descuentos_modified' => false,
+            'codgrupo_descuento' => null,
+        ];
+        \cliente::$lastSaveResult = null;
+        \grupo_descuentos::$grupoDescData = [];
+
+        $controller = $this->invokeProductionSaveCliente(
+            ['cod' => '000001'],
+            [
+                'action' => 'save_cliente',
+                'codcliente' => '000001',
+                'nombre' => 'Mapped By Authority',
+                'codgrupo' => '',
+                'codgrupo_descuento' => '',
+            ]
+        );
+
+        // The production mapping reached the entity: the submitted name is on it.
+        $this->assertSame('Mapped By Authority', $controller->cliente->nombre);
+
+        // Empty selections stay null — no fallback code and no '000000'.
+        $this->assertNull($controller->cliente->codgrupo);
+        $this->assertNotSame('000000', $controller->cliente->codgrupo);
+        $this->assertNull($controller->cliente->codgrupo_descuento);
+
+        // cliente::test() rejected the missing group inside the authority, so
+        // nothing was persisted.
+        $this->assertFalse(\cliente::$lastSaveResult, 'save() must fail the mandatory group validation');
     }
 
     // -------------------------------------------------------------------------

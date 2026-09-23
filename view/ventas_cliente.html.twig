@@ -57,258 +57,16 @@
         </div>
         <div class="panel-body">
             <form id="form_edit_cliente" action="{{ cliente.url() }}" method="post" x-data="clienteGrupoRequired">
-                {{ csrf_field() }}
-                <input type="hidden" name="action" value="save_cliente" />
-                <input type="hidden" name="codcliente" value="{{ cliente.codcliente }}" />
-
-                <div class="row">
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('codigo-cliente') }}</label>
-                            <input type="text" value="{{ cliente.codcliente }}" class="form-control" readonly />
-                        </div>
-                    </div>
-                    <div class="col-sm-4">
-                        <div class="form-group">
-                            <label>{{ trans('nombre-cliente') }} *</label>
-                            <input type="text" name="nombre" value="{{ cliente.nombre }}" class="form-control"
-                                maxlength="100" required />
-                        </div>
-                    </div>
-                    <div class="col-sm-4">
-                        <div class="form-group">
-                            <label>{{ trans('razonsocial') }}</label>
-                            <input type="text" name="razonsocial" value="{{ cliente.razonsocial }}" class="form-control"
-                                maxlength="100" />
-                        </div>
-                    </div>
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('cifnif') }}</label>
-                            <input type="text" name="cifnif" value="{{ cliente.cifnif }}" class="form-control"
-                                maxlength="30" />
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('tipoidfiscal') }}</label>
-                            <input type="text" name="tipoidfiscal" value="{{ cliente.tipoidfiscal }}" class="form-control"
-                                maxlength="25" />
-                        </div>
-                    </div>
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('persona-fisica') }}</label>
-                            <select name="personafisica" class="form-control">
-                                <option value="1"{% if cliente.personafisica %} selected{% endif %}>{{ trans('persona-fisica') }}</option>
-                                <option value="0"{% if not cliente.personafisica %} selected{% endif %}>{{ trans('persona-juridica') }}</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('telefono1') }}</label>
-                            <input type="text" name="telefono1" value="{{ cliente.telefono1 }}" class="form-control"
-                                maxlength="30" />
-                        </div>
-                    </div>
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('telefono2') }}</label>
-                            <input type="text" name="telefono2" value="{{ cliente.telefono2 }}" class="form-control"
-                                maxlength="30" />
-                        </div>
-                    </div>
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('fax') }}</label>
-                            <input type="text" name="fax" value="{{ cliente.fax }}" class="form-control" maxlength="30" />
-                        </div>
-                    </div>
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('email') }}</label>
-                            <input type="email" name="email" value="{{ cliente.email }}" class="form-control"
-                                maxlength="100" />
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-sm-3">
-                        <div class="form-group">
-                            <label>{{ trans('web') }}</label>
-                            <input type="url" name="web" value="{{ cliente.web }}" class="form-control" maxlength="250" />
-                        </div>
-                    </div>
-                    <div class="col-sm-3">
-                        <div class="form-group">
-                            <label>{{ trans('grupo-cliente') }} *</label>
-                            <select name="codgrupo" class="form-control" x-model="codgrupo" required>
-                                <option value="" disabled{% if not cliente.codgrupo %} selected{% endif %}>— {{ trans('seleccione-grupo') }} —</option>
-                                {% for g in fsc.grupos %}
-                                <option value="{{ g.codgrupo }}"{% if cliente.codgrupo == g.codgrupo %} selected{% endif %}>
-                                    {{ g.nombre }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                            <p class="help-block text-danger" x-show="missing()" x-cloak>
-                                {{ trans('grupo-obligatorio') }}
-                            </p>
-                        </div>
-                    </div>
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('regimen-iva') }}</label>
-                            <select name="regimeniva" class="form-control">
-                                {% for regimen in fsc.regimenes_iva %}
-                                <option value="{{ regimen }}"{% if cliente.regimeniva == regimen %} selected{% endif %}>
-                                    {{ regimen }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('recargo-equivalencia') }}</label>
-                            <select name="recargo" class="form-control">
-                                <option value="0"{% if not cliente.recargo %} selected{% endif %}>No</option>
-                                <option value="1"{% if cliente.recargo %} selected{% endif %}>Sí</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('dias-pago') }}</label>
-                            <input type="text" name="diaspago" value="{{ cliente.diaspago }}" class="form-control"
-                                maxlength="10" placeholder="1,15,31" />
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('fecha-alta') }}</label>
-                            <input type="text" value="{{ cliente.fechaalta }}" class="form-control" readonly />
-                        </div>
-                    </div>
-                    <div class="col-sm-2">
-                        <div class="form-group">
-                            <label>{{ trans('cliente-de-baja') }}</label>
-                            <select name="debaja" class="form-control">
-                                <option value="0"{% if not cliente.debaja %} selected{% endif %}>No</option>
-                                <option value="1"{% if cliente.debaja %} selected{% endif %}>Sí</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-sm-8">
-                        <div class="form-group">
-                            <label>{{ trans('observaciones') }}</label>
-                            <textarea name="observaciones" class="form-control" rows="2">{{ cliente.observaciones }}</textarea>
-                        </div>
-                    </div>
-                </div>
-
-                {{ render_hook('cliente_form_after_main', {'fsc': fsc, 'cliente': cliente})|raw }}
-
-                {# Descuentos del cliente #}
-                <div class="panel panel-info" style="margin-top: 15px;">
-                    <div class="panel-heading">
-                        <h4 class="panel-title">
-                            <i class="fa fa-percent"></i> {{ trans('descuentos') }}
-                            {% if cliente.codgrupo_descuento %}
-                                {% for gd in fsc.grupos_descuentos %}
-                                    {% if gd.codgrupo_descuento == cliente.codgrupo_descuento %}
-                                        — {{ gd.nombre }}
-                                        {% if cliente.descuentos_modified %}
-                                            <span class="label label-warning">{{ trans('modificado') }}</span>
-                                        {% endif %}
-                                    {% endif %}
-                                {% endfor %}
-                            {% endif %}
-                        </h4>
-                    </div>
-                    <div class="panel-body">
-                        <div class="row">
-                            <div class="col-sm-3">
-                                <div class="form-group">
-                                    <label>{{ trans('grupo-descuentos') }}</label>
-                                    <select name="codgrupo_descuento" class="form-control">
-                                        <option value="">{{ trans('sin-grupo-descuentos') }}</option>
-                                        {% for gd in fsc.grupos_descuentos %}
-                                        <option value="{{ gd.codgrupo_descuento }}"{% if cliente.codgrupo_descuento == gd.codgrupo_descuento %} selected{% endif %}>
-                                            {{ gd.nombre }}
-                                        </option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-sm-2">
-                                <div class="form-group">
-                                    <label>D1 (%)</label>
-                                    <input type="number" name="d1" value="{{ cliente.d1 ?? 0 }}" class="form-control"
-                                        step="0.01" min="0" max="100" />
-                                </div>
-                            </div>
-                            <div class="col-sm-2">
-                                <div class="form-group">
-                                    <label>D2 (%)</label>
-                                    <input type="number" name="d2" value="{{ cliente.d2 ?? 0 }}" class="form-control"
-                                        step="0.01" min="0" max="100" />
-                                </div>
-                            </div>
-                            <div class="col-sm-2">
-                                <div class="form-group">
-                                    <label>D3 (%)</label>
-                                    <input type="number" name="d3" value="{{ cliente.d3 ?? 0 }}" class="form-control"
-                                        step="0.01" min="0" max="100" />
-                                </div>
-                            </div>
-                            <div class="col-sm-2">
-                                <div class="form-group">
-                                    <label>D4 (%)</label>
-                                    <input type="number" name="d4" value="{{ cliente.d4 ?? 0 }}" class="form-control"
-                                        step="0.01" min="0" max="100" />
-                                </div>
-                            </div>
-                            <div class="col-sm-1">
-                                {% if cliente.descuentos_modified and cliente.codgrupo_descuento %}
-                                <div style="margin-top: 25px;">
-                                    <button type="button" id="btn_reset_descuentos" class="btn btn-sm btn-warning">
-                                        <i class="fa fa-undo"></i>
-                                    </button>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row" style="margin-top: 10px;">
-                    <div class="col-xs-4">
-                        {% if fsc.allow_delete %}
-                        <button type="button" id="btn_delete_cliente" class="btn btn-sm btn-danger">
-                            <i class="fa fa-trash fa-fw" aria-hidden="true"></i>
-                            <span class="hidden-xs hidden-sm">{{ trans('eliminar') }}</span>
-                        </button>
-                        {% endif %}
-                    </div>
-                    <div class="col-xs-8 text-right">
-                        <a class="btn btn-sm btn-default" href="{{ cliente.url() }}">
-                            <i class="fa fa-refresh fa-fw" aria-hidden="true"></i>
-                            <span class="hidden-xs hidden-sm">{{ trans('deshacer') }}</span>
-                        </a>
-                        <button class="btn btn-sm btn-primary" type="submit" :disabled="missing()">
-                            <i class="fa fa-floppy-o fa-fw" aria-hidden="true"></i>
-                            <span class="hidden-xs">{{ trans('guardar') }}</span>
-                        </button>
-                    </div>
-                </div>
+                {% include '@clientes_core/Cliente/Form.html.twig' with {
+                    mode: 'edit',
+                    action_name: 'save_cliente',
+                    cliente: cliente,
+                    grupos: fsc.grupos,
+                    grupos_descuentos: fsc.grupos_descuentos,
+                    regimenes_iva: fsc.regimenes_iva,
+                    id_prefix: 'edit_cliente',
+                    allow_delete: fsc.allow_delete
+                } %}
             </form>
             <form id="form_delete_cliente" method="post" action="{{ cliente.url() }}" style="display:none;">
                 {{ csrf_field() }}
@@ -476,7 +234,7 @@
 
 <script type="text/javascript">
     $(document).ready(function () {
-        $("#btn_delete_cliente").click(function (event) {
+        $("#edit_cliente_btn_delete_cliente").click(function (event) {
             event.preventDefault();
             bootbox.confirm({
                 message: '{{ trans("confirmar-eliminar") }}',
@@ -489,7 +247,7 @@
             });
         });
 
-        $("#btn_reset_descuentos").click(function(event) {
+        $("#edit_cliente_btn_reset_descuentos").click(function(event) {
             event.preventDefault();
             bootbox.confirm({
                 message: '¿Restaurar descuentos a los valores del grupo?',
@@ -504,37 +262,5 @@
 </script>
 
 {% endif %}
-
-{# Alpine CSP component registration — nonce'd classic script, idempotent via
-   a window marker so a re-executed script cannot double-register. #}
-<script {{ csp_nonce_attr() }}>
-(function () {
-    if (window.__clientesCoreGrupoRequiredRegistered === true) { return; }
-
-    function registerClienteGrupoRequired() {
-        if (window.__clientesCoreGrupoRequiredRegistered === true) { return; }
-        window.__clientesCoreGrupoRequiredRegistered = true;
-
-        Alpine.data('clienteGrupoRequired', function () {
-            return {
-                codgrupo: '',
-                init: function () {
-                    var select = this.$el.querySelector('select[name="codgrupo"]');
-                    if (select) { this.codgrupo = select.value || ''; }
-                },
-                missing: function () {
-                    return this.codgrupo === '' || this.codgrupo === null;
-                }
-            };
-        });
-    }
-
-    if (window.Alpine) {
-        registerClienteGrupoRequired();
-    } else {
-        document.addEventListener('alpine:init', registerClienteGrupoRequired);
-    }
-})();
-</script>
 
 {{ include('footer.html.twig') }}
