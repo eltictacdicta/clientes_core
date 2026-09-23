@@ -159,9 +159,19 @@ class descuentos_grupo extends clientes_controller
             return;
         }
 
-        $cod = filter_input(INPUT_POST, 'codgrupo_descuento') ?? '';
+        $cod = trim((string) (
+            $this->request->request->get('codgrupo_descuento')
+            ?? filter_input(INPUT_POST, 'codgrupo_descuento')
+            ?? ''
+        ));
         if ($cod === '') {
             $this->new_error_msg('Código de grupo no proporcionado.');
+            return;
+        }
+
+        $inUse = (new cliente())->countByDiscountGroup($cod);
+        if ($inUse > 0) {
+            $this->new_error_msg('No se puede eliminar el grupo de descuentos: hay clientes asignados a él.');
             return;
         }
 

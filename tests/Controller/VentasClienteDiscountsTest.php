@@ -140,12 +140,20 @@ final class VentasClienteDiscountsTest extends TestCase
             public $descuentos_modified = false;
             public $codgrupo_descuento;
             public static $getReturnData = null;
+            public static $lastSaveResult = null;
+            public static $countByDiscountGroupResult = 0;
 
             public function __construct($data = false) { $this->table_name = "clientes"; }
             public function delete(): bool { return false; }
             public function exists(): bool { return false; }
-            public function test(): bool { $this->codcliente = $this->codcliente ?? "000001"; return true; }
-            public function save(): bool { return true; }
+            public function test(): bool {
+                if ($this->codgrupo === null || $this->codgrupo === "") { return false; }
+                if ($this->codgrupo_descuento === null || $this->codgrupo_descuento === "") { return false; }
+                $this->codcliente = $this->codcliente ?? "000001";
+                return true;
+            }
+            public function save(): bool { $result = $this->test(); self::$lastSaveResult = $result; return $result; }
+            public function countByDiscountGroup(string $cod): int { return self::$countByDiscountGroupResult; }
             public function url(): string { return "index.php?page=ventas_cliente&cod=" . $this->codcliente; }
             public function get_errors(): array { return []; }
             public function search($q = "", $offset = 0) { return []; }
@@ -415,7 +423,7 @@ final class VentasClienteDiscountsTest extends TestCase
         $c->web = $postData['web'] ?? $c->web;
         $c->coddivisa = !empty($postData['coddivisa']) ? $postData['coddivisa'] : null;
         $codgrupo = $postData['codgrupo'] ?? null;
-        $c->codgrupo = !empty($codgrupo) ? $codgrupo : '000000';
+        $c->codgrupo = !empty($codgrupo) ? $codgrupo : null;
         $c->regimeniva = $postData['regimeniva'] ?? $c->regimeniva;
         $c->recargo = ($postData['recargo'] ?? '') === '1';
         $c->personafisica = ($postData['personafisica'] ?? '') === '1';
@@ -828,14 +836,15 @@ final class VentasClienteDiscountsTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
-    // T21: new client gets Personalizado group
+    // T21 (flipped): empty codgrupo stays null and fails mandatory validation
     // -------------------------------------------------------------------------
 
     /**
-     * T21: save_cliente with empty codgrupo assigns Personalizado (000000).
+     * T21: save_cliente with an empty codgrupo keeps it null, the mandatory
+     * group validation fails the save and no '000000' fallback is written.
      */
     #[Test]
-    public function saveClienteEmptyCodgrupoAssignsPersonalizado(): void
+    public function saveClienteEmptyCodgrupoStaysNullAndFailsValidation(): void
     {
         \cliente::$getReturnData = [
             'codcliente' => '000001',
@@ -847,7 +856,9 @@ final class VentasClienteDiscountsTest extends TestCase
             'd3' => 0.0,
             'd4' => 0.0,
             'descuentos_modified' => false,
+            'codgrupo_descuento' => '000000',
         ];
+        \cliente::$lastSaveResult = null;
 
         \grupo_descuentos::$grupoDescData = [];
 
@@ -856,14 +867,16 @@ final class VentasClienteDiscountsTest extends TestCase
             ['action' => 'save_cliente', 'codcliente' => '000001', 'nombre' => 'Test', 'codgrupo' => '']
         );
 
-        $this->assertSame('000000', $controller->cliente->codgrupo);
+        $this->assertNull($controller->cliente->codgrupo);
+        $this->assertNotSame('000000', $controller->cliente->codgrupo);
+        $this->assertFalse(\cliente::$lastSaveResult, 'save() must fail the mandatory group validation');
     }
 
     /**
-     * T21 variant: null codgrupo also assigns Personalizado.
+     * T21 variant: an absent codgrupo key also stays null and fails validation.
      */
     #[Test]
-    public function saveClienteNullCodgrupoAssignsPersonalizado(): void
+    public function saveClienteMissingCodgrupoStaysNullAndFailsValidation(): void
     {
         \cliente::$getReturnData = [
             'codcliente' => '000001',
@@ -875,7 +888,9 @@ final class VentasClienteDiscountsTest extends TestCase
             'd3' => 0.0,
             'd4' => 0.0,
             'descuentos_modified' => false,
+            'codgrupo_descuento' => '000000',
         ];
+        \cliente::$lastSaveResult = null;
 
         \grupo_descuentos::$grupoDescData = [];
 
@@ -884,7 +899,27 @@ final class VentasClienteDiscountsTest extends TestCase
             ['action' => 'save_cliente', 'codcliente' => '000001', 'nombre' => 'Test']
         );
 
-        $this->assertSame('000000', $controller->cliente->codgrupo);
+        $this->assertNull($controller->cliente->codgrupo);
+        $this->assertNotSame('000000', $controller->cliente->codgrupo);
+        $this->assertFalse(\cliente::$lastSaveResult, 'save() must fail the mandatory group validation');
+    }
+
+    /**
+     * No code path writes the discount code into codgrupo: the production
+     * save_cliente() mapping must not carry the '000000' fallback.
+     */
+    #[Test]
+    public function saveClienteProductionCodeNeverFallsBackToDiscountCode(): void
+    {
+        $source = (string) file_get_contents(
+            FS_FOLDER . '/plugins/clientes_core/controller/ventas_cliente.php'
+        );
+
+        $this->assertDoesNotMatchRegularExpression(
+            "/codgrupo[^;]*'000000'/",
+            $source,
+            'save_cliente() must not assign the discount code to codgrupo'
+        );
     }
 
     // -------------------------------------------------------------------------

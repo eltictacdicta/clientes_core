@@ -50,4 +50,20 @@ final class ClienteGrupoRequiredViewTest extends TestCase
             self::assertStringContainsString('alpine.boot()', $view);
         }
     }
+
+    /**
+     * The undeletable default marker must key on the client group code
+     * ('000001'), never on the discount code ('000000').
+     */
+    public function testClientGroupDeleteControlKeysOnClientGroupCode(): void
+    {
+        $view = $this->view('ventas_clientes.html.twig');
+
+        self::assertStringContainsString("g.codgrupo != '000001'", $view);
+        self::assertDoesNotMatchRegularExpression(
+            "/codgrupo\\s*!=\\s*'000000'/",
+            $view,
+            'the protected default must not be compared against the discount code'
+        );
+    }
 }

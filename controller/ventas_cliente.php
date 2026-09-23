@@ -134,7 +134,7 @@ class ventas_cliente extends clientes_controller
         $this->cliente->web = filter_input(INPUT_POST, 'web') ?? $this->cliente->web;
         $this->cliente->coddivisa = !empty(filter_input(INPUT_POST, 'coddivisa')) ? filter_input(INPUT_POST, 'coddivisa') : null;
         $codgrupo = filter_input(INPUT_POST, 'codgrupo');
-        $this->cliente->codgrupo = !empty($codgrupo) ? $codgrupo : '000000';
+        $this->cliente->codgrupo = !empty($codgrupo) ? $codgrupo : null;
         $this->cliente->regimeniva = filter_input(INPUT_POST, 'regimeniva') ?? $this->cliente->regimeniva;
         $this->cliente->recargo = filter_input(INPUT_POST, 'recargo') === '1';
         $this->cliente->personafisica = filter_input(INPUT_POST, 'personafisica') === '1';

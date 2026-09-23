@@ -203,14 +203,17 @@ final class VentasClientesDispatchTest extends TestCase
             public $observaciones;
             public $diaspago;
             public $codgrupo_descuento;
+            public static $countByGroupResult = 0;
+            public static $lastSavedCodgrupo = null;
             public function __construct($data = false) { $this->table_name = "clientes"; }
             public function delete(): bool { return false; }
             public function exists(): bool { return false; }
             public function test(): bool { $this->codcliente = $this->codcliente ?? "000001"; return true; }
-            public function save(): bool { return $this->test(); }
+            public function save(): bool { self::$lastSavedCodgrupo = $this->codgrupo; return $this->test(); }
             public function url(): string { return "index.php?page=ventas_cliente&cod=" . $this->codcliente; }
             public function get_errors(): array { return []; }
             public function search($q = "", $offset = 0) { return []; }
+            public function countByGroup(string $cod): int { return self::$countByGroupResult; }
         }');
     }
 
@@ -219,12 +222,19 @@ final class VentasClientesDispatchTest extends TestCase
         eval('class grupo_clientes extends \fs_model {
             public $codgrupo;
             public $nombre;
+            public static $deleted = [];
             public function __construct($data = false) { $this->table_name = "gruposclientes"; }
-            public function delete(): bool { return false; }
+            public function delete(): bool { self::$deleted[] = $this->codgrupo; return true; }
             public function exists(): bool { return false; }
             public function save(): bool { return true; }
             public function all(): array { return []; }
             public function test(): bool { return true; }
+            public function get($cod) {
+                $g = new \grupo_clientes();
+                $g->codgrupo = $cod;
+                $g->nombre = "Test Group";
+                return $g;
+            }
         }');
     }
 
@@ -303,5 +313,68 @@ final class VentasClientesDispatchTest extends TestCase
         $this->assertNull($result['cliente_codcliente']);
         $this->assertNull($result['redirect_url']);
         $this->assertNotEmpty($result['errors']);
+    }
+
+    /**
+     * In-use client group cannot be deleted: no DELETE is issued, exactly one
+     * error is recorded and the request stays successful (no exception).
+     */
+    public function testDeleteGrupoRefusesWhenGroupIsInUse(): void
+    {
+        $this->enableDelete();
+        \cliente::$countByGroupResult = 3;
+        \grupo_clientes::$deleted = [];
+
+        $this->buildController(['action' => 'delete_grupo', 'codgrupo' => '000005']);
+        $result = $this->controller->dispatch();
+
+        $this->assertSame('delete_grupo', $result['action']);
+        $this->assertSame([], \grupo_clientes::$deleted, 'no DELETE must be issued for an in-use group');
+        $this->assertCount(1, $result['errors'], 'exactly one refusal error must be recorded');
+        $this->assertStringContainsString(
+            'no se puede eliminar el grupo',
+            mb_strtolower($result['errors'][0])
+        );
+    }
+
+    /**
+     * Unreferenced client group still deletes normally.
+     */
+    public function testDeleteGrupoDeletesWhenNotInUse(): void
+    {
+        $this->enableDelete();
+        \cliente::$countByGroupResult = 0;
+        \grupo_clientes::$deleted = [];
+
+        $this->buildController(['action' => 'delete_grupo', 'codgrupo' => '000005']);
+        $result = $this->controller->dispatch();
+
+        $this->assertSame(['000005'], \grupo_clientes::$deleted);
+        $this->assertSame([], $result['errors']);
+    }
+
+    /**
+     * The create path never writes the discount code into the client group.
+     */
+    public function testNuevoClienteNeverWritesDiscountCodeIntoClientGroup(): void
+    {
+        \cliente::$lastSavedCodgrupo = null;
+        $this->buildController(['action' => 'nuevo_cliente', 'nombre' => 'New Client', 'codgrupo' => '']);
+        $result = $this->controller->dispatch();
+
+        $this->assertSame('nuevo_cliente', $result['action']);
+        $this->assertNotSame('000000', \cliente::$lastSavedCodgrupo);
+        $this->assertNull(\cliente::$lastSavedCodgrupo);
+    }
+
+    /**
+     * Grant delete permission to the configured controller and user stub.
+     */
+    private function enableDelete(): void
+    {
+        $this->controller->user = new class {
+            public function allow_delete_on($page) { return true; }
+        };
+        $this->controller->allow_delete = true;
     }
 }

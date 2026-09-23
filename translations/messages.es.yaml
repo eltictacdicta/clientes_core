@@ -65,6 +65,7 @@ nombre-grupo: "Nombre del grupo"
 codigo-grupo: "Código"
 tarifa-grupo: "Tarifa del grupo"
 sin-grupo: "Sin grupo"
+grupo-descuentos: "Grupo de descuentos"
 
 # Mensajes
 cliente-guardado: "Cliente guardado correctamente."
@@ -85,6 +86,8 @@ error-razonsocial-cliente: "Razón social del cliente no válida (máximo 100 ca
 error-nombre-grupo: "Nombre de grupo no válido."
 grupo-obligatorio: "Debe seleccionar un grupo para guardar."
 seleccione-grupo: "Seleccione un grupo"
+grupo-descuentos-obligatorio: "Debe seleccionar un grupo de descuentos para guardar."
+seleccione-grupo-descuentos: "Seleccione un grupo de descuentos"
 sin-grupos-disponibles: "No hay grupos de clientes disponibles. Cree un grupo antes de añadir clientes."
 
 # Acciones
