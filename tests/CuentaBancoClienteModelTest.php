@@ -65,15 +65,12 @@ class CuentaBancoClienteModelTest extends TestCase
         $this->assertFileDoesNotExist(FS_FOLDER . '/plugins/business_data/model/table/cuentasbcocli.xml');
     }
 
-    public function testBusinessDataStubDelegatesToClientesCore(): void
+    public function testBusinessDataDoesNotDuplicateClientBankAccountModel(): void
     {
-        require_once FS_FOLDER . '/plugins/business_data/model/cuenta_banco_cliente.php';
-
-        $this->assertTrue(class_exists('cuenta_banco_cliente'));
-        $this->assertSame(
-            realpath(FS_FOLDER . '/plugins/clientes_core/model/cuenta_banco_cliente.php'),
-            realpath((new \ReflectionClass('cuenta_banco_cliente'))->getFileName())
-        );
+        // cuenta_banco_cliente is owned by clientes_core. business_data must not
+        // ship a copy of the model or its schema (would fork the definition).
+        $this->assertFileExists(FS_FOLDER . '/plugins/clientes_core/model/cuenta_banco_cliente.php');
+        $this->assertFileDoesNotExist(FS_FOLDER . '/plugins/business_data/model/cuenta_banco_cliente.php');
     }
 
     public function testDefaultValues(): void
