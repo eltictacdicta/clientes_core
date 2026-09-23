@@ -70,13 +70,20 @@ class Init
      * so a DB error during the seed never breaks plugin
      * activation. This is in addition to (not a replacement
      * for) the framework-level try/catch in runPluginUpgrade.
+     *
+     * Self-sufficient legacy loading: the method loads `fs_settings`
+     * and `fs_cache` on demand (see legacyClass()), so it does not
+     * depend on PluginSchemaSynchronizer's hardcoded preload list.
+     * Any other entry point (CLI migration, tests) works too.
      */
     public static function upgrade(): void
     {
+        self::legacyClass('fs_settings');
         $settings = new \fs_settings();
 
         // Invalidate schema check cache so check_table() re-runs and detects
         // new/changed columns from XML (e.g. codgrupo_descuento on clientes).
+        self::legacyClass('fs_cache');
         $cache = new \fs_cache();
         $cache->delete('fs_checked_tables');
 
@@ -120,6 +127,31 @@ class Init
 
         // (3) Mandatory-group backfill, gated by its own flag.
         self::runMandatoryGroupBackfill($settings);
+    }
+
+    /**
+     * Loads a legacy framework class from `base/` on demand.
+     *
+     * `upgrade()` runs from several entry points (the plugin synchronizer, a
+     * CLI migration script, tests). Only the plugin synchronizer preloads the
+     * legacy base classes (PluginSchemaSynchronizer::INIT_MIGRATION_LEGACY_CLASSES),
+     * so any other caller fataled with `Class "fs_settings" not found`. This
+     * mirrors the core precedent (src/Core/Html.php `system_logo_url` /
+     * `system_name`): guarded `class_exists(..., false)` plus `require_once`.
+     *
+     * `$class` is always an internal literal call, never user input. When
+     * FS_FOLDER is undefined the file's own location resolves the repo root.
+     *
+     * @param string $class Legacy global class name, e.g. 'fs_settings'.
+     */
+    private static function legacyClass(string $class): void
+    {
+        if (class_exists($class, false)) {
+            return;
+        }
+
+        $folder = defined('FS_FOLDER') ? FS_FOLDER : dirname(__DIR__, 2);
+        require_once $folder . '/base/' . $class . '.php';
     }
 
     /**
