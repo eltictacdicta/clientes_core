@@ -4,3 +4,6 @@
 # Scratch de planificación interna del desarrollo — no se publica.
 /.planning/
 
+# Índice local de tooling de agentes (mismo criterio que el repo raíz).
+/.atl/
+
