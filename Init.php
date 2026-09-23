@@ -21,10 +21,12 @@ namespace FSFramework\Plugins\clientes_core;
 
 use FSFramework\Event\FSEventDispatcher;
 use FSFramework\Event\TwigInitEvent;
+use FSFramework\Event\TwigLoaderEvent;
 use FSFramework\model\cliente;
 use FSFramework\model\grupo_clientes;
 use FSFramework\model\grupo_descuentos;
 use FSFramework\View\ViewHookRegistry;
+use Twig\Loader\FilesystemLoader;
 
 /**
  * Initialization class for clientes_core plugin.
@@ -35,6 +37,16 @@ class Init
     public function init(): void
     {
         $dispatcher = FSEventDispatcher::getInstance();
+
+        // Expose the plugin's View/ tree under the @clientes_core Twig
+        // namespace, following the clientes_catalogo precedent. Belt and
+        // braces with Html::addPluginViewPaths(); no core change required.
+        $dispatcher->addListener(TwigLoaderEvent::NAME, function (TwigLoaderEvent $event) {
+            $loader = $event->getLoader();
+            if ($loader instanceof FilesystemLoader) {
+                $loader->addPath(__DIR__ . '/View', 'clientes_core');
+            }
+        });
 
         $dispatcher->addListener(TwigInitEvent::NAME, function (TwigInitEvent $event) {
             $this->registerTwigExtensions($event->getTwig());
