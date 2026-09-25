@@ -215,6 +215,7 @@ final class VentasClientesDispatchTest extends TestCase
             public function get_errors(): array { return []; }
             public function search($q = "", $offset = 0) { return []; }
             public function countByGroup(string $cod): int { return self::$countByGroupResult; }
+            public function regimenes_iva(): array { return ["General", "Exento"]; }
         }');
     }
 

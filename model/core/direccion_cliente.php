@@ -162,52 +162,81 @@ class direccion_cliente extends \fs_model
 
         $this->fecha = date('d-m-Y');
 
-        $sql = "";
-        if ($this->domenvio) {
-            $sql .= self::SQL_UPDATE . $this->table_name . " SET domenvio = false"
-                . self::FK_WHERE_CLIENTE . $this->var2str($this->codcliente) . ";";
-        }
-        if ($this->domfacturacion) {
-            $sql .= self::SQL_UPDATE . $this->table_name . " SET domfacturacion = false"
-                . self::FK_WHERE_CLIENTE . $this->var2str($this->codcliente) . ";";
-        }
+        /**
+         * El motor actual ejecuta sentencias simples (mysqli::prepare), por lo que
+         * cada escritura va por separado dentro de una transacción manual. Así se
+         * conserva la atomicidad que antes daba la consulta multi-sentencia.
+         */
+        $autoTransactions = $this->db->get_auto_transactions();
+        $this->db->set_auto_transactions(FALSE);
 
-        if ($this->exists()) {
-            $sql .= self::SQL_UPDATE . $this->table_name . " SET codcliente = " . $this->var2str($this->codcliente)
-                . ", codpais = " . $this->var2str($this->codpais)
-                . ", apartado = " . $this->var2str($this->apartado)
-                . ", provincia = " . $this->var2str($this->provincia)
-                . ", ciudad = " . $this->var2str($this->ciudad)
-                . ", codpostal = " . $this->var2str($this->codpostal)
-                . ", direccion = " . $this->var2str($this->direccion)
-                . ", domenvio = " . $this->var2str($this->domenvio)
-                . ", domfacturacion = " . $this->var2str($this->domfacturacion)
-                . ", descripcion = " . $this->var2str($this->descripcion)
-                . ", fecha = " . $this->var2str($this->fecha)
-                . self::PK_WHERE_ID . $this->var2str($this->id) . ";";
+        try {
+            if (!$this->db->begin_transaction()) {
+                return FALSE;
+            }
 
-            return $this->db->exec($sql);
-        }
+            $ok = TRUE;
 
-        $sql .= "INSERT INTO " . $this->table_name . " (codcliente,codpais,apartado,provincia,ciudad,codpostal,
-            direccion,domenvio,domfacturacion,descripcion,fecha) VALUES (" . $this->var2str($this->codcliente)
-            . "," . $this->var2str($this->codpais)
-            . "," . $this->var2str($this->apartado)
-            . "," . $this->var2str($this->provincia)
-            . "," . $this->var2str($this->ciudad)
-            . "," . $this->var2str($this->codpostal)
-            . "," . $this->var2str($this->direccion)
-            . "," . $this->var2str($this->domenvio)
-            . "," . $this->var2str($this->domfacturacion)
-            . "," . $this->var2str($this->descripcion)
-            . "," . $this->var2str($this->fecha) . ");";
+            /// Al marcar esta dirección como principal, se quita la marca al resto.
+            if ($this->domenvio) {
+                $ok = $this->db->exec(self::SQL_UPDATE . $this->table_name . " SET domenvio = false"
+                    . self::FK_WHERE_CLIENTE . $this->var2str($this->codcliente) . ";", FALSE);
+            }
 
-        if ($this->db->exec($sql)) {
-            $this->id = $this->db->lastval();
+            if ($ok && $this->domfacturacion) {
+                $ok = $this->db->exec(self::SQL_UPDATE . $this->table_name . " SET domfacturacion = false"
+                    . self::FK_WHERE_CLIENTE . $this->var2str($this->codcliente) . ";", FALSE);
+            }
+
+            if ($ok && $this->exists()) {
+                $ok = $this->db->exec(self::SQL_UPDATE . $this->table_name . " SET codcliente = " . $this->var2str($this->codcliente)
+                    . ", codpais = " . $this->var2str($this->codpais)
+                    . ", apartado = " . $this->var2str($this->apartado)
+                    . ", provincia = " . $this->var2str($this->provincia)
+                    . ", ciudad = " . $this->var2str($this->ciudad)
+                    . ", codpostal = " . $this->var2str($this->codpostal)
+                    . ", direccion = " . $this->var2str($this->direccion)
+                    . ", domenvio = " . $this->var2str($this->domenvio)
+                    . ", domfacturacion = " . $this->var2str($this->domfacturacion)
+                    . ", descripcion = " . $this->var2str($this->descripcion)
+                    . ", fecha = " . $this->var2str($this->fecha)
+                    . self::PK_WHERE_ID . $this->var2str($this->id) . ";", FALSE);
+            } elseif ($ok) {
+                $ok = $this->db->exec("INSERT INTO " . $this->table_name . " (codcliente,codpais,apartado,provincia,ciudad,codpostal,"
+                    . "direccion,domenvio,domfacturacion,descripcion,fecha) VALUES (" . $this->var2str($this->codcliente)
+                    . "," . $this->var2str($this->codpais)
+                    . "," . $this->var2str($this->apartado)
+                    . "," . $this->var2str($this->provincia)
+                    . "," . $this->var2str($this->ciudad)
+                    . "," . $this->var2str($this->codpostal)
+                    . "," . $this->var2str($this->direccion)
+                    . "," . $this->var2str($this->domenvio)
+                    . "," . $this->var2str($this->domfacturacion)
+                    . "," . $this->var2str($this->descripcion)
+                    . "," . $this->var2str($this->fecha) . ");", FALSE);
+
+                if ($ok) {
+                    $this->id = $this->db->lastval();
+                }
+            }
+
+            if (!$ok) {
+                $this->db->rollback();
+                return FALSE;
+            }
+
+            if (!$this->db->commit()) {
+                $this->db->rollback();
+                return FALSE;
+            }
+
             return TRUE;
+        } catch (\Throwable $e) {
+            $this->db->rollback();
+            return FALSE;
+        } finally {
+            $this->db->set_auto_transactions($autoTransactions);
         }
-
-        return FALSE;
     }
 
     public function delete()

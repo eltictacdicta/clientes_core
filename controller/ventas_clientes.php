@@ -18,7 +18,9 @@
  */
 
 require_once dirname(__DIR__) . '/extras/clientes_controller.php';
+require_once dirname(__DIR__) . '/model/core/grupo_descuentos.php';
 
+use FSFramework\model\grupo_descuentos;
 use FSFramework\Plugins\clientes_core\ClienteForm;
 
 /**
@@ -32,6 +34,8 @@ class ventas_clientes extends clientes_controller
     public $clientes;
     public $grupo;
     public $grupos;
+    public $grupos_descuentos;
+    public $regimenes_iva;
     public $offset;
     public $orden;
     public $query;
@@ -67,9 +71,17 @@ class ventas_clientes extends clientes_controller
         $this->query = '';
         $this->grupo = FALSE;
         $this->grupos = [];
+        $this->grupos_descuentos = [];
+        $this->regimenes_iva = [];
 
         $grupo_model = new grupo_clientes();
         $this->grupos = $grupo_model->all();
+
+        // The create modal renders the shared form with both catalogs; without
+        // them the discount-group and IVA-regime selects are empty.
+        $grupoDescModel = new grupo_descuentos();
+        $this->grupos_descuentos = $grupoDescModel->all();
+        $this->regimenes_iva = (new cliente())->regimenes_iva();
 
         $result = $this->dispatch();
 

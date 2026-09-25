@@ -303,6 +303,12 @@ final class ClienteGrupoRequiredViewTest extends TestCase
             'the discount-group select must be bound to Alpine and mandatory'
         );
 
+        // Discount options expose d1-d4 so Alpine can fill the inputs on change
+        // without a page reload.
+        self::assertStringContainsString('data-d1=', $html);
+        self::assertStringContainsString('data-d4=', $html);
+        self::assertStringContainsString('applyGroupDiscountsFromSelect', $html);
+
         // No selectable empty option: every empty option is disabled.
         preg_match_all('/<option value=""[^>]*>/', $html, $matches);
         self::assertNotEmpty($matches[0]);
@@ -313,6 +319,30 @@ final class ClienteGrupoRequiredViewTest extends TestCase
                 'an empty group option must never be selectable'
             );
         }
+    }
+
+    /**
+     * Regression guard for the "selecting a discount group does not fill
+     * D1-D4" defect: inside an Alpine event handler `this` is bound to the
+     * element carrying the directive (the <select>), so `this.$el` cannot see
+     * the sibling D1-D4 inputs. The handler must scope the lookup through the
+     * form that owns the <select>.
+     */
+    #[Test]
+    public function discountGroupHandlerScopesInputsToTheOwningForm(): void
+    {
+        $partial = $this->partial('Cliente/Fields.html.twig');
+
+        self::assertStringContainsString(
+            'select.form || select.closest',
+            $partial,
+            'the handler must resolve D1-D4 from the form that owns the <select>'
+        );
+        self::assertStringNotContainsString(
+            "this.\$el.querySelector('input[name=\"'",
+            $partial,
+            'this.$el is the <select> in an event handler and must not be used to find D1-D4'
+        );
     }
 
     #[Test]

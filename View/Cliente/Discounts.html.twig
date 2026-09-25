@@ -20,9 +20,9 @@
 {% set id_prefix = id_prefix|default('cliente') %}
 {% set input_class = input_class|default('form-control') %}
 
-<div class="panel panel-info" style="margin-top: 15px;">
+<div class="panel panel-info" style="margin-top: 10px;">
     <div class="panel-heading">
-        <h4 class="panel-title">
+        <div class="panel-title">
             <i class="fa fa-percent"></i> {{ trans('descuentos') }}
             {% if cliente and cliente.codgrupo_descuento %}
                 {% for gd in grupos_descuentos %}
@@ -34,7 +34,7 @@
                     {% endif %}
                 {% endfor %}
             {% endif %}
-        </h4>
+        </div>
     </div>
     <div class="panel-body">
         <div class="row">
@@ -42,10 +42,15 @@
                 <div class="form-group">
                     <label for="{{ id_prefix }}_grupo_descuento">{{ trans('grupo-descuentos') }} *</label>
                     <select name="codgrupo_descuento" id="{{ id_prefix }}_grupo_descuento"
-                        class="{{ input_class }}" x-model="codgrupoDescuento" required>
+                        class="{{ input_class }}" x-model="codgrupoDescuento"
+                        @change="applyGroupDiscountsFromSelect($event.target)"
+                        required>
                         <option value="" disabled{% if not cliente or not cliente.codgrupo_descuento %} selected{% endif %}>— {{ trans('seleccione-grupo-descuentos') }} —</option>
                         {% for gd in grupos_descuentos %}
-                        <option value="{{ gd.codgrupo_descuento }}"{% if cliente and cliente.codgrupo_descuento == gd.codgrupo_descuento %} selected{% endif %}>
+                        <option value="{{ gd.codgrupo_descuento }}"
+                            data-d1="{{ gd.d1 ?? 0 }}" data-d2="{{ gd.d2 ?? 0 }}"
+                            data-d3="{{ gd.d3 ?? 0 }}" data-d4="{{ gd.d4 ?? 0 }}"
+                            {% if cliente and cliente.codgrupo_descuento == gd.codgrupo_descuento %} selected{% endif %}>
                             {{ gd.nombre }}
                         </option>
                         {% endfor %}
@@ -67,13 +72,16 @@
             </div>
             {% endfor %}
             <div class="col-sm-1">
-                {% if cliente and cliente.descuentos_modified and cliente.codgrupo_descuento %}
-                <div style="margin-top: 25px;">
-                    <button type="button" id="{{ id_prefix }}_btn_reset_descuentos" class="btn btn-sm btn-warning">
+                <div class="form-group" style="min-height: 2.6em;">
+                    <label aria-hidden="true">&nbsp;</label>
+                    {% if cliente and cliente.codgrupo_descuento %}
+                    <button type="button" id="{{ id_prefix }}_btn_reset_descuentos"
+                        class="btn btn-default btn-block"
+                        title="{{ trans('restaurar-descuentos-grupo')|default('Restaurar descuentos del grupo') }}">
                         <i class="fa fa-undo"></i>
                     </button>
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
         </div>
     </div>

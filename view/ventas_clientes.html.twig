@@ -16,6 +16,19 @@
     [x-cloak] {
         display: none !important;
     }
+
+    /* Create modal: default Bootstrap dialog is too narrow for the 12-col
+       client form (col-sm-2 fields collapse). Widen and constrain to the
+       viewport. */
+    .modal-cliente-form {
+        width: min(1080px, calc(100vw - 24px));
+        margin: 12px auto;
+    }
+
+    .modal-cliente-form .modal-body {
+        max-height: min(72vh, 780px);
+        overflow-y: auto;
+    }
 </style>
 
 <div class="container-fluid" style="margin-bottom: 10px;">
@@ -254,7 +267,7 @@
 
 {# Modal: Nuevo cliente #}
 <div class="modal fade" id="modal_nuevo_cliente" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-lg modal-cliente-form" role="document">
         <div class="modal-content">
             <form action="{{ fsc.url() }}" method="post" x-data="clienteGrupoRequired">
                 <div class="modal-header">

@@ -247,6 +247,10 @@
             });
         });
 
+        // The reset action is server-authoritative: it reloads the group's
+        // current defaults and persists them, clearing descuentos_modified.
+        // Confirming before POST avoids discarding manual per-client overrides
+        // by accident.
         $("#edit_cliente_btn_reset_descuentos").click(function(event) {
             event.preventDefault();
             bootbox.confirm({

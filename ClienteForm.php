@@ -101,19 +101,40 @@ final class ClienteForm
             $cliente->{$field} = '1' === (string) $post[$field];
         }
 
+        $previousDiscountGroup = property_exists($cliente, 'codgrupo_descuento')
+            ? ($cliente->codgrupo_descuento ?? null)
+            : null;
+
         if (array_key_exists('codgrupo', $post)) {
             $codgrupo = trim((string) $post['codgrupo']);
             $cliente->codgrupo = $codgrupo === '' ? null : $codgrupo;
         }
 
+        $currentDiscountGroup = $previousDiscountGroup;
         if (array_key_exists('codgrupo_descuento', $post)) {
             $codgrupoDescuento = trim((string) $post['codgrupo_descuento']);
-            $cliente->codgrupo_descuento = $codgrupoDescuento === '' ? null : $codgrupoDescuento;
+            $currentDiscountGroup = $codgrupoDescuento === '' ? null : $codgrupoDescuento;
+            $cliente->codgrupo_descuento = $currentDiscountGroup;
         }
 
         foreach (self::DISCOUNT_FIELDS as $field) {
             if (array_key_exists($field, $post)) {
                 $cliente->{$field} = (float) $post[$field];
+            }
+        }
+
+        // Spec "Client inherits group discounts" + "Group change overwrites
+        // client discounts": any assignment that changes the discount group —
+        // including the first one (null -> code) — overwrites d1-d4 with the
+        // group's own values and clears the modified flag. Only when the group
+        // is unchanged do the submitted values survive as a per-client override.
+        $groupChanged = $currentDiscountGroup !== null
+            && $currentDiscountGroup !== $previousDiscountGroup;
+
+        if ($groupChanged) {
+            $grupo = self::loadDiscountGroup($cliente);
+            if ($grupo !== null && method_exists($cliente, 'applyGroupDiscounts')) {
+                $cliente->applyGroupDiscounts($grupo);
             }
         }
 
@@ -134,6 +155,11 @@ final class ClienteForm
     /**
      * Pure diff: true when any d1-d4 differs from the loaded group, compared
      * rounded to 2 decimals. Returns false when no group is supplied.
+     *
+     * An unset (NULL) discount and a 0.00 discount mean the same thing — no
+     * discount — so both normalize to 0.0 before comparing. Without this, the
+     * "Personalizado" group (NULL d1-d4) would flag every client as modified
+     * the moment its defaults are applied.
      */
     public static function computeDescuentosModified(object $cliente, ?object $grupoDescuentos): bool
     {
@@ -142,8 +168,8 @@ final class ClienteForm
         }
 
         foreach (self::DISCOUNT_FIELDS as $field) {
-            $clientVal = $cliente->{$field} !== null ? round((float) $cliente->{$field}, 2) : null;
-            $groupVal = $grupoDescuentos->{$field} !== null ? round((float) $grupoDescuentos->{$field}, 2) : null;
+            $clientVal = round((float) ($cliente->{$field} ?? 0), 2);
+            $groupVal = round((float) ($grupoDescuentos->{$field} ?? 0), 2);
 
             if ($clientVal !== $groupVal) {
                 return true;

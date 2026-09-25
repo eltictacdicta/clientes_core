@@ -69,14 +69,14 @@
 </div>
 
 <div class="row">
-    <div class="col-sm-2">
+    <div class="col-sm-3">
         <div class="form-group">
             <label>{{ trans('tipoidfiscal') }}</label>
             <input type="text" name="tipoidfiscal" value="{{ cliente ? cliente.tipoidfiscal : '' }}"
                 class="{{ input_class }}" maxlength="25" />
         </div>
     </div>
-    <div class="col-sm-2">
+    <div class="col-sm-3">
         <div class="form-group">
             <label>{{ trans('persona-fisica') }}</label>
             <select name="personafisica" class="{{ input_class }}">
@@ -101,13 +101,6 @@
     </div>
     <div class="col-sm-2">
         <div class="form-group">
-            <label>{{ trans('fax') }}</label>
-            <input type="text" name="fax" value="{{ cliente ? cliente.fax : '' }}"
-                class="{{ input_class }}" maxlength="30" />
-        </div>
-    </div>
-    <div class="col-sm-2">
-        <div class="form-group">
             <label>{{ trans('email') }}</label>
             <input type="email" name="email" value="{{ cliente ? cliente.email : '' }}"
                 class="{{ input_class }}" maxlength="100" />
@@ -116,6 +109,13 @@
 </div>
 
 <div class="row">
+    <div class="col-sm-3">
+        <div class="form-group">
+            <label>{{ trans('fax') }}</label>
+            <input type="text" name="fax" value="{{ cliente ? cliente.fax : '' }}"
+                class="{{ input_class }}" maxlength="30" />
+        </div>
+    </div>
     <div class="col-sm-3">
         <div class="form-group">
             <label>{{ trans('web') }}</label>
@@ -141,7 +141,7 @@
             </p>
         </div>
     </div>
-    <div class="col-sm-2">
+    <div class="col-sm-3">
         <div class="form-group">
             <label>{{ trans('regimen-iva') }}</label>
             <select name="regimeniva" class="{{ input_class }}">
@@ -153,7 +153,10 @@
             </select>
         </div>
     </div>
-    <div class="col-sm-2">
+</div>
+
+<div class="row">
+    <div class="col-sm-3">
         <div class="form-group">
             <label>{{ trans('recargo-equivalencia') }}</label>
             <select name="recargo" class="{{ input_class }}">
@@ -162,23 +165,20 @@
             </select>
         </div>
     </div>
-    <div class="col-sm-2">
+    <div class="col-sm-3">
         <div class="form-group">
             <label>{{ trans('dias-pago') }}</label>
             <input type="text" name="diaspago" value="{{ cliente ? cliente.diaspago : '' }}"
                 class="{{ input_class }}" maxlength="10" placeholder="1,15,31" />
         </div>
     </div>
-</div>
-
-<div class="row">
-    <div class="col-sm-2">
+    <div class="col-sm-3">
         <div class="form-group">
             <label>{{ trans('fecha-alta') }}</label>
             <input type="text" value="{{ cliente ? cliente.fechaalta : '' }}" class="{{ input_class }}" readonly />
         </div>
     </div>
-    <div class="col-sm-2">
+    <div class="col-sm-3">
         <div class="form-group">
             <label>{{ trans('cliente-de-baja') }}</label>
             <select name="debaja" class="{{ input_class }}">
@@ -187,7 +187,10 @@
             </select>
         </div>
     </div>
-    <div class="col-sm-8">
+</div>
+
+<div class="row">
+    <div class="col-sm-12">
         <div class="form-group">
             <label>{{ trans('observaciones') }}</label>
             <textarea name="observaciones" class="{{ input_class }}" rows="2">{{ cliente ? cliente.observaciones : '' }}</textarea>
@@ -220,6 +223,27 @@
                 missing: function () {
                     return this.codgrupo === '' || this.codgrupo === null
                         || this.codgrupoDescuento === '' || this.codgrupoDescuento === null;
+                },
+                // Instant d1-d4 fill from the selected discount-group option
+                // (data-d1..d4) so the form never needs a full reload to show
+                // the group defaults.
+                //
+                // Resolve the inputs from the form that owns the <select>, not
+                // from `this.$el`: Alpine binds `this` to the element carrying
+                // the directive (the <select> itself), so `this.$el` cannot see
+                // the d1-d4 inputs that live next to it in the same form.
+                applyGroupDiscountsFromSelect: function (select) {
+                    if (!select || !select.selectedOptions || !select.selectedOptions.length) {
+                        return;
+                    }
+                    var opt = select.selectedOptions[0];
+                    if (!opt || !opt.value) { return; }
+                    var scope = select.form || select.closest('[x-data]') || document;
+                    ['d1', 'd2', 'd3', 'd4'].forEach(function (field) {
+                        if (opt.dataset[field] === undefined) { return; }
+                        var input = scope.querySelector('input[name="' + field + '"]');
+                        if (input) { input.value = opt.dataset[field]; }
+                    });
                 }
             };
         });

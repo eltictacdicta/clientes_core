@@ -84,11 +84,22 @@ final class ClienteFormClienteDouble
     /** @var array<int, string> */
     public array $errors = [];
     public int $testCalls = 0;
+    /** @var array<int, object> Groups passed to applyGroupDiscounts(). */
+    public array $appliedGroups = [];
 
     public function test(): bool
     {
         $this->testCalls++;
         return $this->testResult;
+    }
+
+    public function applyGroupDiscounts(object $grupoDescuentos): void
+    {
+        $this->appliedGroups[] = $grupoDescuentos;
+        foreach (['d1', 'd2', 'd3', 'd4'] as $field) {
+            $this->{$field} = (float) $grupoDescuentos->{$field};
+        }
+        $this->descuentos_modified = false;
     }
 
     /** @return array<int, string> */
@@ -288,9 +299,37 @@ final class ClienteFormAuthorityTest extends TestCase
     }
 
     /**
+     * An unset (NULL) group discount and a 0.00 client discount mean the same
+     * thing — no discount — so the diff must treat them as equal. Otherwise the
+     * "Personalizado" group (NULL d1-d4) would flag every client as modified
+     * right after its defaults are applied.
+     */
+    #[Test]
+    public function computeDescuentosModifiedTreatsNullAndZeroAsEqual(): void
+    {
+        $cliente = new ClienteFormClienteDouble();
+        $cliente->d1 = 0.0;
+        $cliente->d2 = 0.0;
+        $cliente->d3 = 0.0;
+        $cliente->d4 = 0.0;
+
+        $grupo = new ClienteFormGrupoDouble();
+        $grupo->d1 = null;
+        $grupo->d2 = null;
+        $grupo->d3 = null;
+        $grupo->d4 = null;
+
+        $this->assertFalse(ClienteForm::computeDescuentosModified($cliente, $grupo));
+
+        $grupo->d1 = 5.0;
+        $this->assertTrue(ClienteForm::computeDescuentosModified($cliente, $grupo));
+    }
+
+    /**
      * apply() loads the selected group and sets descuentos_modified from the
      * single diff implementation (scenario: "Descuentos diff is computed in one
-     * place").
+     * place"). The client is already in the group, so the submitted d1-d4 are
+     * per-client overrides and survive the mapping.
      */
     #[Test]
     public function applySetsDescuentosModifiedFromLoadedGroup(): void
@@ -304,21 +343,113 @@ final class ClienteFormAuthorityTest extends TestCase
         ClienteFormGrupoDouble::$groups['000001'] = $grupo;
 
         $cliente = new ClienteFormClienteDouble();
+        $cliente->codgrupo_descuento = '000001';
         $cliente->d2 = 5.0;
         $cliente->d3 = 0.0;
         $cliente->d4 = 0.0;
         ClienteForm::apply($cliente, ['codgrupo_descuento' => '000001', 'd1' => '15.00']);
 
         $this->assertSame('000001', $cliente->codgrupo_descuento);
+        $this->assertSame(15.0, $cliente->d1);
         $this->assertTrue($cliente->descuentos_modified);
 
         $matching = new ClienteFormClienteDouble();
+        $matching->codgrupo_descuento = '000001';
         $matching->d2 = 5.0;
         $matching->d3 = 0.0;
         $matching->d4 = 0.0;
         ClienteForm::apply($matching, ['codgrupo_descuento' => '000001', 'd1' => '10.00']);
 
         $this->assertFalse($matching->descuentos_modified);
+    }
+
+    /**
+     * Spec client-discount-inheritance: "Group change overwrites client
+     * discounts" — switching from one non-null group to another must copy the
+     * new group's d1-d4 and clear descuentos_modified, discarding stale form
+     * values from the previous group.
+     */
+    #[Test]
+    public function applyOverwritesDiscountsWhenGroupChanges(): void
+    {
+        $old = new ClienteFormGrupoDouble();
+        $old->codgrupo_descuento = '000001';
+        $old->d1 = 10.0;
+        $old->d2 = 5.0;
+        $old->d3 = 0.0;
+        $old->d4 = 0.0;
+        ClienteFormGrupoDouble::$groups['000001'] = $old;
+
+        $new = new ClienteFormGrupoDouble();
+        $new->codgrupo_descuento = '000002';
+        $new->d1 = 20.0;
+        $new->d2 = 10.0;
+        $new->d3 = 5.0;
+        $new->d4 = 0.0;
+        ClienteFormGrupoDouble::$groups['000002'] = $new;
+
+        $cliente = new ClienteFormClienteDouble();
+        $cliente->codgrupo_descuento = '000001';
+        $cliente->d1 = 15.0;
+        $cliente->d2 = 8.0;
+        $cliente->d3 = 0.0;
+        $cliente->d4 = 0.0;
+        $cliente->descuentos_modified = true;
+
+        ClienteForm::apply($cliente, [
+            'codgrupo_descuento' => '000002',
+            // Stale values from the old group / manual edits: must be discarded.
+            'd1' => '15.00',
+            'd2' => '8.00',
+            'd3' => '0',
+            'd4' => '0',
+        ]);
+
+        $this->assertSame('000002', $cliente->codgrupo_descuento);
+        $this->assertSame(20.0, $cliente->d1);
+        $this->assertSame(10.0, $cliente->d2);
+        $this->assertSame(5.0, $cliente->d3);
+        $this->assertSame(0.0, $cliente->d4);
+        $this->assertFalse($cliente->descuentos_modified);
+        $this->assertCount(1, $cliente->appliedGroups);
+    }
+
+    /**
+     * First assignment (null -> code) is a discount-group change, so it must
+     * copy the group's values and clear the modified flag. Spec
+     * client-discount-inheritance: "Assigning a group copies discounts to
+     * client".
+     */
+    #[Test]
+    public function applyOverwritesDiscountsOnFirstAssignment(): void
+    {
+        $grupo = new ClienteFormGrupoDouble();
+        $grupo->codgrupo_descuento = '000001';
+        $grupo->d1 = 10.0;
+        $grupo->d2 = 5.0;
+        $grupo->d3 = 0.0;
+        $grupo->d4 = 0.0;
+        ClienteFormGrupoDouble::$groups['000001'] = $grupo;
+
+        $cliente = new ClienteFormClienteDouble();
+        $this->assertNull($cliente->codgrupo_descuento);
+
+        ClienteForm::apply($cliente, [
+            'codgrupo_descuento' => '000001',
+            // Stale/default form values must not survive the assignment.
+            'd1' => '15.00',
+            'd2' => '5.00',
+            'd3' => '0',
+            'd4' => '0',
+        ]);
+
+        $this->assertSame('000001', $cliente->codgrupo_descuento);
+        $this->assertSame(10.0, $cliente->d1);
+        $this->assertSame(5.0, $cliente->d2);
+        $this->assertSame(0.0, $cliente->d3);
+        $this->assertSame(0.0, $cliente->d4);
+        $this->assertFalse($cliente->descuentos_modified);
+        $this->assertCount(1, $cliente->appliedGroups);
     }
 
     // -------------------------------------------------------------------------
