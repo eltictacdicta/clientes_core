@@ -538,9 +538,22 @@ class cliente extends \fs_model
             return false;
         }
 
-        if ($this->codgrupo === null || $this->codgrupo === '') {
-            $this->new_error_msg("El cliente debe pertenecer a un grupo.");
-            return false;
+        // El grupo de cliente es opcional: el cliente puede existir sin grupo
+        // hasta que un administrador le asigne uno. Normalizamos el vacío a NULL
+        // para no persistir cadenas vacías y sólo validamos su existencia cuando
+        // el valor viene informado.
+        $codgrupo = $this->codgrupo === null ? '' : trim((string) $this->codgrupo);
+        if ($codgrupo === '') {
+            $this->codgrupo = null;
+        } else {
+            $this->codgrupo = $codgrupo;
+            $existe = $this->db->select(
+                "SELECT codgrupo FROM gruposclientes WHERE codgrupo = " . $this->var2str($codgrupo) . ";"
+            );
+            if (empty($existe)) {
+                $this->new_error_msg("El grupo de cliente no existe: " . $codgrupo);
+                return false;
+            }
         }
 
         if ($this->codgrupo_descuento === null || $this->codgrupo_descuento === '') {
@@ -592,19 +605,6 @@ class cliente extends \fs_model
 
         $this->applyGroupDiscounts($grupo);
         return true;
-    }
-
-    /**
-     * Assigns clients without a group to the given group code.
-     * Used by the plugin activation migration.
-     */
-    public function assignOrphanClientsToGroup(string $codgrupo): bool
-    {
-        return (bool) $this->db->exec(
-            "UPDATE " . $this->table_name
-            . " SET codgrupo = " . $this->var2str($codgrupo)
-            . " WHERE codgrupo IS NULL;"
-        );
     }
 
     /**

@@ -9,7 +9,7 @@ discount fields (`d1`–`d4`), validation constraints, cascade semantics,
 and the default "Personalizado" discount group that serves as the
 mandatory discount default for all clients. It is distinct from the
 `grupo_clientes` client group (stored in `gruposclientes`, keyed by
-`codgrupo`), whose default is `'000001'` "General".
+`codgrupo`), which is optional and has no guaranteed default.
 
 ## Domain context
 
@@ -26,8 +26,8 @@ A default discount group "Personalizado" (code `000000`, d1–d4 = 0.00)
 is created during plugin migration and assigned to all existing clients
 without a discount group. This group is the mandatory discount default
 and cannot be deleted while any `clientes` row references it as
-`codgrupo_descuento`. It is never assigned to `clientes.codgrupo`; the
-client-group default is `'000001'` "General".
+`codgrupo_descuento`. It is never assigned to `clientes.codgrupo`; client
+groups are optional and no default client group is guaranteed.
 
 ## Requirements
 
@@ -170,4 +170,4 @@ silently re-orphan clients. The discount-group guard SHALL live in
 - WHEN the delete is requested
 - THEN the group row is removed
 
-<!-- Source of truth. Last updated: 2026-09-23. Merged from changes/cliente-form-compartido-grupos-obligatorios/specs/discount-groups/spec.md. -->
+<!-- Source of truth. Last updated: 2026-09-28. Allow-unassigned-client-group: the client group is optional, so no '000001' client-group default is guaranteed. -->

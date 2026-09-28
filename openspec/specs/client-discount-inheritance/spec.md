@@ -110,6 +110,9 @@ group (`codgrupo`, entity `grupo_clientes`) and a discount group
 (`codgrupo_descuento`, entity `grupo_descuentos`) are distinct; scenarios and
 implementation MUST use the column that matches the concept. Client-group
 scenarios use `codgrupo`; discount-group scenarios use `codgrupo_descuento`.
+Only the discount group is mandatory: a client MAY exist without a client
+group (see the `clientes` capability), but it MUST always have a discount
+group.
 
 Every client MUST have a discount group explicitly selected.
 `cliente::test()` SHALL reject a `codgrupo_descuento` that is `NULL`. At save
@@ -160,7 +163,7 @@ saves.
 - AND clients with `codgrupo = NULL`
 - WHEN the activation backfill migration runs
 - THEN each `codgrupo_descuento IS NULL` row is assigned the discount group `'000000'` "Personalizado" (`d1–d4 = 0.00`)
-- AND each `codgrupo IS NULL` row is assigned the client group `'000001'` "General"
-- AND the two backfills never write a discount-group code into `codgrupo` or a client-group code into `codgrupo_descuento`
+- AND no `codgrupo` value is modified: clients without a client group stay `NULL`
+- AND the backfill never writes a discount-group code into `codgrupo`
 
-<!-- Source of truth. Last updated: 2026-09-22. Merged from changes/cliente-form-compartido-grupos-obligatorios/specs/client-discount-inheritance/spec.md. -->
+<!-- Source of truth. Last updated: 2026-09-28. Allow-unassigned-client-group: only the discount group remains mandatory; the client group is optional and Init::upgrade() never touches clientes.codgrupo. -->

@@ -173,9 +173,9 @@ class InitUpgradeTest extends TestCase
             'Seeded cliente must have the canonical default name'
         );
         $this->assertSame(
-            '000001',
+            null,
             \FSFramework\model\cliente::$instances[0]->codgrupo,
-            'Seeded cliente must reference the General client group'
+            'Seeded cliente must have no client group (optional since this change)'
         );
         $this->assertSame(
             '000000',
@@ -197,7 +197,7 @@ class InitUpgradeTest extends TestCase
             \FSFramework\model\cliente::$table_has_rows_calls,
             'table_has_rows() must be called exactly once to detect the empty table'
         );
-        $this->assertSame(1, \FSFramework\model\grupo_clientes::$saveCalls);
+        $this->assertSame(0, \FSFramework\model\grupo_clientes::$saveCalls);
         $this->assertSame(1, \FSFramework\model\grupo_descuentos::$saveCalls);
     }
 
@@ -221,7 +221,6 @@ class InitUpgradeTest extends TestCase
         );
         $this->assertSame(0, \FSFramework\model\grupo_clientes::$saveCalls);
         $this->assertSame(0, \FSFramework\model\grupo_descuentos::$saveCalls);
-        $this->assertSame(0, \FSFramework\model\cliente::$assignOrphanCalls);
         $this->assertSame(0, \FSFramework\model\cliente::$assignDiscountOrphanCalls);
         $this->assertSame(
             '1',
@@ -367,31 +366,26 @@ class InitUpgradeTest extends TestCase
     }
 
     /**
-     * Creates both default groups and backfills the two orphan columns,
-     * each from its own column.
+     * Creates the default discount group and backfills the discount orphan
+     * column. The client group is never created, adopted or backfilled.
      */
-    public function test_creates_default_groups_and_backfills_orphans(): void
+    public function test_creates_default_discount_group_and_backfills_discount_orphans(): void
     {
         \FSFramework\model\cliente::$table_has_rows_result = true;
         $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
 
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 
-        // Client group: '000001' General, never the discount code.
-        $this->assertSame(1, \FSFramework\model\grupo_clientes::$saveCalls);
-        $this->assertArrayHasKey(
-            '000001',
-            \FSFramework\model\grupo_clientes::$storedGroups ?? [],
-            'General client group must be stored with code 000001'
-        );
+        // No client group is created or adopted.
         $this->assertSame(
-            'General',
-            \FSFramework\model\grupo_clientes::$storedGroups['000001']['nombre']
+            0,
+            \FSFramework\model\grupo_clientes::$saveCalls,
+            'Init::upgrade() must never create or adopt a client group'
         );
         $this->assertArrayNotHasKey(
-            '000000',
+            '000001',
             \FSFramework\model\grupo_clientes::$storedGroups ?? [],
-            'The discount code 000000 must never be stored as a client group'
+            'Init::upgrade() must never create the 000001 client group'
         );
 
         // Discount group: '000000' Personalizado, d1-d4 = 0.00.
@@ -405,14 +399,6 @@ class InitUpgradeTest extends TestCase
         $this->assertSame('Personalizado', $personalizado['nombre']);
         $this->assertSame(0.00, $personalizado['d1']);
         $this->assertSame(0.00, $personalizado['d4']);
-
-        // Client-group orphan backfill targets 000001.
-        $this->assertSame(1, \FSFramework\model\cliente::$assignOrphanCalls);
-        $this->assertSame(
-            '000001',
-            \FSFramework\model\cliente::$assignOrphanCodgrupo,
-            'Orphan client-group backfill must target 000001'
-        );
 
         // Discount orphan backfill targets 000000.
         $this->assertSame(1, \FSFramework\model\cliente::$assignDiscountOrphanCalls);
@@ -442,11 +428,9 @@ class InitUpgradeTest extends TestCase
 
         $this->assertSame(
             1,
-            \FSFramework\model\cliente::$assignOrphanCalls,
-            'The backfill must still run when only the legacy flag is set'
+            \FSFramework\model\cliente::$assignDiscountOrphanCalls,
+            'The discount backfill must still run when only the legacy flag is set'
         );
-        $this->assertSame('000001', \FSFramework\model\cliente::$assignOrphanCodgrupo);
-        $this->assertSame(1, \FSFramework\model\cliente::$assignDiscountOrphanCalls);
         $this->assertSame('000000', \FSFramework\model\cliente::$assignDiscountOrphanCodgrupo);
         $this->assertSame(
             '1',
@@ -480,22 +464,16 @@ class InitUpgradeTest extends TestCase
         );
         $this->assertSame(
             0,
-            \FSFramework\model\cliente::$assignOrphanCalls,
-            'No client-group UPDATE must be issued on a re-run'
-        );
-        $this->assertSame(
-            0,
             \FSFramework\model\cliente::$assignDiscountOrphanCalls,
             'No discount-group UPDATE must be issued on a re-run'
         );
     }
 
     /**
-     * R8 — a populated gruposclientes table lacking '000001' still gets
-     * the General default created (the old table_has_rows() early return
-     * is removed).
+     * Init::upgrade() must never create or adopt a client group, even on a
+     * populated gruposclientes table lacking the old '000001' default.
      */
-    public function test_ensure_default_client_group_on_populated_table_lacking_default(): void
+    public function test_does_not_create_or_adopt_client_groups(): void
     {
         \FSFramework\model\cliente::$table_has_rows_result = true;
         $GLOBALS['config2']['clientes_core_default_seeded'] = '1';
@@ -504,32 +482,23 @@ class InitUpgradeTest extends TestCase
         \FSFramework\model\grupo_clientes::$storedGroups = [
             '000002' => ['codgrupo' => '000002', 'nombre' => 'Otro', 'codtarifa' => null],
         ];
-        \FSFramework\model\grupo_descuentos::$storedGroups = [
-            '000000' => [
-                'codgrupo_descuento' => '000000',
-                'nombre' => 'Personalizado',
-                'd1' => 0.00,
-                'd2' => 0.00,
-                'd3' => 0.00,
-                'd4' => 0.00,
-            ],
-        ];
 
         \FSFramework\Plugins\clientes_core\Init::upgrade();
 
-        $this->assertArrayHasKey(
+        $this->assertSame(
+            0,
+            \FSFramework\model\grupo_clientes::$saveCalls,
+            'Init::upgrade() must not create any client group'
+        );
+        $this->assertArrayNotHasKey(
             '000001',
             \FSFramework\model\grupo_clientes::$storedGroups,
-            'A non-empty table lacking 000001 must still get the General default'
+            'Init::upgrade() must not adopt or create the 000001 client group'
         );
-        $this->assertSame(
-            'General',
-            \FSFramework\model\grupo_clientes::$storedGroups['000001']['nombre']
-        );
-        $this->assertSame(
-            1,
-            \FSFramework\model\grupo_clientes::$saveCalls,
-            'Exactly the General default must be created'
+        $this->assertArrayHasKey(
+            '000002',
+            \FSFramework\model\grupo_clientes::$storedGroups,
+            'The pre-existing client groups must be left untouched'
         );
     }
 

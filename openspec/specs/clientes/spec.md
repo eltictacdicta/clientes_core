@@ -87,11 +87,14 @@ On a successful seed (empty table → INSERT), the seeder SHALL set
 the `clientes_core_default_seeded` flag to `'1'` in `fs_settings` and
 persist it to disk via `fs_settings::save()`.
 
-The seeder SHALL set only `nombre='Cliente por defecto'` on the
-new client; all other fields SHALL use the `cliente` model's
-constructor defaults (`cifnif=''`, `tipoidfiscal='NIF'`,
-`personafisica=true`, `regimeniva='General'`, `debaja=false`,
-`codcliente` auto-assigned by `cliente::get_new_codigo()`).
+The seeder SHALL set `nombre='Cliente por defecto'`,
+`codgrupo = NULL` and `codgrupo_descuento = '000000'` on the new client.
+The client group is left NULL because a client MAY exist without one; the
+discount group is the canonical "Personalizado" group guaranteed by
+`ensureDefaultDiscountGroup()` before the seed. All other fields SHALL use
+the `cliente` model's constructor defaults (`cifnif=''`,
+`tipoidfiscal='NIF'`, `personafisica=true`, `regimeniva='General'`,
+`debaja=false`, `codcliente` auto-assigned by `cliente::get_new_codigo()`).
 
 The seeder body SHALL be wrapped in
 `try { ... } catch (\Throwable $e) { /* swallow */ }` so a DB
@@ -107,6 +110,14 @@ error during the seed never breaks plugin activation.
 - AND that row's `nombre` is `'Cliente por defecto'`
 - AND `clientes_core_default_seeded` is set to `'1'` in `fs_settings`
 - AND the flag is persisted to `tmp/{FS_TMP_NAME}config2.ini`
+
+#### Scenario: Seeded client has no client group
+
+- GIVEN a fresh install with an empty `clientes` table
+- WHEN `Init::upgrade()` seeds the default client
+- THEN the seeded row's `codgrupo` is `NULL` (no client group is assigned)
+- AND the seeded row's `codgrupo_descuento` is `'000000'`
+- AND no client group is created or adopted by the seeder
 
 #### Scenario: Non-empty install skips the insert and still sets the flag
 
@@ -300,44 +311,51 @@ these fields from the `$data` array when provided.
 - THEN `$cliente->d1` is `10.00`
 - AND `$cliente->d2` is `5.00`
 
-### Requirement: New client gets default group
+### Requirement: Client group is optional
 
-The prior behaviour — assigning a fallback group to a new client when no group
-was selected — is removed. A client's group (`codgrupo`) SHALL be explicitly
-selected by the user. `cliente::test()` SHALL reject a `codgrupo` that is
-`NULL` or an empty string. No controller, model, activation-time save step or
-consumer SHALL assign a fallback group code when `codgrupo` is empty; the save
-SHALL fail validation instead.
+A client MAY exist without a client group (`clientes.codgrupo = NULL`) until an
+administrator assigns one explicitly. `cliente::test()` SHALL accept a
+`codgrupo` that is `NULL` or an empty string, normalizing the empty string to
+`NULL` so an empty value is never persisted.
+
+When `codgrupo` IS informed, `cliente::test()` SHALL verify that the code
+exists in `gruposclientes` with a direct query through the model's `$db` handle
+(the same raw `FROM gruposclientes` access used by `fix_db()`), and SHALL fail
+with a clear validation message when it does not — before the raw foreign key
+error (`errno 1452` on `ca_clientes_grupos`) can surface.
+
+No controller, model, activation-time save step or consumer SHALL assign a
+fallback client-group code when `codgrupo` is empty; the save SHALL accept the
+absence of a group instead.
 
 `'000000'` is a discount-group code (`gruposdescuentos.codgrupo_descuento`).
 No code path in `clientes_core` or its consumers SHALL write `'000000'` into
-`codgrupo`. The paths corrected by this change are `Init::upgrade()`,
-`controller/ventas_cliente.php`, `controller/ventas_clientes.php` and the
-`tpvmod` consumer.
+`codgrupo`.
 
-The client group `'000001'` "General" SHALL be guaranteed by
-`ensureDefaultClientGroup()` even when the `gruposclientes` table is non-empty
-but lacks `'000001'`. The early return on a non-empty table SHALL be fixed.
+The read-side marker for the undeletable default group in
+`view/ventas_clientes.html.twig` SHALL remain the client group `'000001'`
+(explicitly out of scope for this change), not the discount code `'000000'`.
 
-The default client group is the migration backfill target for legacy rows
-without a group; it is not a runtime fallback for new saves. The read-side
-marker for the undeletable default group in `view/ventas_clientes.html.twig`
-SHALL be the client group `'000001'`, not the discount code `'000000'`.
+#### Scenario: Client with NULL or empty codgrupo passes validation
 
-#### Scenario: New client without an explicit group fails validation
-
-- GIVEN a new client form submitted without a group selection
-- WHEN the save is processed
-- THEN `cliente::test()` fails with a group-required error
-- AND no `clientes` row is persisted
-- AND `codgrupo` is not set to any fallback code
-
-#### Scenario: Client with NULL or empty codgrupo fails validation
-
-- GIVEN a client with `codgrupo = NULL` or `codgrupo = ''`
+- GIVEN a client with `codgrupo = NULL` or `codgrupo = ''` and a valid discount group
 - WHEN `test()` is called
-- THEN validation fails
-- AND an error message indicates a group is required
+- THEN validation passes for the client group
+- AND an empty string is normalized to `NULL`
+
+#### Scenario: Client with a non-existent codgrupo fails validation
+
+- GIVEN a client whose `codgrupo` is not present in `gruposclientes`
+- WHEN `test()` is called
+- THEN validation fails with a clear "group does not exist" message
+- AND the raw foreign key error `1452` is never reached
+- AND no `clientes` row is persisted
+
+#### Scenario: A valid codgrupo is accepted
+
+- GIVEN a `codgrupo` that exists in `gruposclientes`
+- WHEN `test()` is called
+- THEN validation passes for the client group
 
 #### Scenario: No code path writes the discount code into codgrupo
 
@@ -345,14 +363,7 @@ SHALL be the client group `'000001'`, not the discount code `'000000'`.
   `controller/ventas_clientes.php`, or the `tpvmod` consumer
 - WHEN the client group is empty
 - THEN `'000000'` is never assigned to `codgrupo`
-- AND the mandatory client group validation is the only outcome
-
-#### Scenario: General group is guaranteed on a populated table
-
-- GIVEN a `gruposclientes` table that is non-empty and does not contain `'000001'`
-- WHEN `ensureDefaultClientGroup()` runs
-- THEN a group `'000001'` named `'General'` is created
-- AND the early return on a non-empty table does not skip it
+- AND no fallback client group is assigned
 
 #### Scenario: The undeletable default marker is the client group code
 
@@ -361,35 +372,30 @@ SHALL be the client group `'000001'`, not the discount code `'000000'`.
 - THEN it keys that decision on `'000001'`
 - AND it does not key it on the discount code `'000000'`
 
-### Requirement: Mandatory group backfill on plugin activation
+### Requirement: Discount-group backfill on plugin activation
 
-`Init::upgrade()` SHALL guarantee the two default groups exist and backfill
-legacy clients that lack them, in a single idempotent, data-only migration
-block:
+`Init::upgrade()` SHALL guarantee the default discount group `'000000'`
+"Personalizado" exists and backfill legacy clients that lack a discount group,
+in a single idempotent, data-only migration block:
 
-1. guarantee client group `'000001'` "General" exists;
-2. guarantee discount group `'000000'` "Personalizado" exists;
-3. `UPDATE clientes SET codgrupo = '000001' WHERE codgrupo IS NULL`;
-4. `UPDATE clientes SET codgrupo_descuento = '000000' WHERE codgrupo_descuento IS NULL`.
+1. guarantee discount group `'000000'` "Personalizado" exists;
+2. `UPDATE clientes SET codgrupo_descuento = '000000' WHERE codgrupo_descuento IS NULL`.
 
-The block SHALL be gated by a NEW flag `clientes_core_discount_group_required`
-in `fs_settings`. It SHALL NOT reuse `clientes_core_discounts_migrated`, which
-is already set on installs that ran the previous migration and would make the
-new step a permanent no-op.
+`Init::upgrade()` SHALL NOT modify `clientes.codgrupo`: it SHALL neither assign
+a fallback client group nor adopt an existing group as "the default". No
+`ensureDefaultClientGroup()` step or `assignOrphanClientsToGroup()` call SHALL
+exist.
+
+The block SHALL be gated by the existing flag
+`clientes_core_discount_group_required` in `fs_settings`. It SHALL NOT reuse
+`clientes_core_discounts_migrated`, which is already set on installs that ran
+the previous migration and would make the new step a permanent no-op.
 
 The migration SHALL be data-only: it SHALL NOT add a foreign key or a
 `NOT NULL` constraint to `codgrupo_descuento` (Q3), and SHALL NOT alter the
 existing `ca_clientes_grupos` foreign key on `codgrupo`. A failure inside the
 block SHALL leave the flag unset so the next activation retries, and SHALL NOT
 break plugin activation.
-
-#### Scenario: Orphan clients are backfilled to the client group
-
-- GIVEN existing `clientes` rows with `codgrupo IS NULL`
-- AND the `clientes_core_discount_group_required` flag is unset
-- WHEN `Init::upgrade()` runs
-- THEN every such row has `codgrupo = '000001'`
-- AND the `'000001'` "General" group exists
 
 #### Scenario: Clients without a discount group are backfilled
 
@@ -399,19 +405,27 @@ break plugin activation.
 - THEN every such row has `codgrupo_descuento = '000000'`
 - AND the `'000000'` "Personalizado" discount group exists
 
+#### Scenario: Client-group column is never modified
+
+- GIVEN existing `clientes` rows with `codgrupo IS NULL`
+- AND the `clientes_core_discount_group_required` flag is unset
+- WHEN `Init::upgrade()` runs
+- THEN no row's `codgrupo` changes
+- AND no client group is created or adopted
+
 #### Scenario: New flag gates the migration independently of the legacy flag
 
 - GIVEN `clientes_core_discounts_migrated` is already set to `'1'`
 - AND `clientes_core_discount_group_required` is unset
 - WHEN `Init::upgrade()` runs
-- THEN the backfill still executes
+- THEN the discount backfill still executes
 - AND the `clientes_core_discount_group_required` flag is set to `'1'`
 
 #### Scenario: Re-running is a no-op
 
 - GIVEN `clientes_core_discount_group_required` is set to `'1'`
 - WHEN `Init::upgrade()` runs again
-- THEN no default group is re-created
+- THEN no default discount group is re-created
 - AND no backfill UPDATE is issued
 
 #### Scenario: Migration adds no constraint
@@ -422,4 +436,4 @@ break plugin activation.
 - AND no foreign key on `codgrupo_descuento` was added
 - AND the `ca_clientes_grupos` foreign key is unchanged
 
-<!-- Source of truth. Last updated: 2026-09-22. Merged from changes/cliente-form-compartido-grupos-obligatorios/specs/clientes/spec.md. -->
+<!-- Source of truth. Last updated: 2026-09-28. Allow-unassigned-client-group: client group is optional, Init::upgrade() never touches clientes.codgrupo; discount-group mandate and backfill kept. -->

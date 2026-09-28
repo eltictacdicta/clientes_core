@@ -23,7 +23,6 @@ use FSFramework\Event\FSEventDispatcher;
 use FSFramework\Event\TwigInitEvent;
 use FSFramework\Event\TwigLoaderEvent;
 use FSFramework\model\cliente;
-use FSFramework\model\grupo_clientes;
 use FSFramework\model\grupo_descuentos;
 use FSFramework\View\ViewHookRegistry;
 use Twig\Loader\FilesystemLoader;
@@ -87,16 +86,17 @@ class Init
         $cache = new \fs_cache();
         $cache->delete('fs_checked_tables');
 
-        // (1) Defaults + default-client seed. Both default groups are guaranteed
-        // BEFORE the seed, because the seed now passes the mandatory-group test().
+        // (1) Defaults + default-client seed. The seed leaves `codgrupo` NULL on
+        // purpose: a client group is optional and no group code is guaranteed to
+        // exist. The discount group is still guaranteed first because
+        // `codgrupo_descuento` remains mandatory in test().
         try {
-            self::ensureDefaultClientGroup();
             self::ensureDefaultDiscountGroup();
 
             $cliente = new cliente();
             if (!$cliente->table_has_rows()) {
                 $cliente->nombre = 'Cliente por defecto';
-                $cliente->codgrupo = '000001';
+                $cliente->codgrupo = null;
                 $cliente->codgrupo_descuento = '000000';
                 $cliente->save();
             }
@@ -155,8 +155,11 @@ class Init
     }
 
     /**
-     * Guarantees the two default groups exist and backfills legacy clients
-     * that lack them, in a single idempotent, data-only migration block.
+     * Guarantees the default discount group exists and backfills legacy clients
+     * that lack one, in a single idempotent, data-only migration block.
+     *
+     * Client groups (`codgrupo`) are NOT touched: a client may have no client
+     * group, so `Init::upgrade()` never assigns or adopts one.
      *
      * The block is gated by the NEW fs_settings key
      * `clientes_core_discount_group_required`. It must not reuse
@@ -173,12 +176,10 @@ class Init
         }
 
         try {
-            // Ensure steps first: the backfill writes codes that must exist.
-            self::ensureDefaultClientGroup();
+            // The backfill writes a discount-group code that must exist first.
             self::ensureDefaultDiscountGroup();
 
             $cliente = new cliente();
-            $cliente->assignOrphanClientsToGroup('000001');
             $cliente->assignOrphanClientsToDiscountGroup('000000');
 
             $settings->set('clientes_core_discount_group_required', '1');
@@ -263,19 +264,6 @@ class Init
             }));
         } catch (\LogicException) {
         }
-    }
-
-    private static function ensureDefaultClientGroup(): void
-    {
-        $grupoModel = new grupo_clientes();
-        if ($grupoModel->get('000001')) {
-            return;
-        }
-
-        $grupo = new grupo_clientes();
-        $grupo->codgrupo = '000001';
-        $grupo->nombre = 'General';
-        $grupo->save();
     }
 
     /**

@@ -18,8 +18,9 @@ The partial is exposed under the plugin's Twig namespace `@clientes_core/...`,
 registered by `plugins/clientes_core/Init.php` through a `TwigLoaderEvent`
 listener that calls `$loader->addPath(__DIR__ . '/View', 'clientes_core')`,
 following the existing `clientes_catalogo` precedent — no core change is
-required. Field mapping, the `descuentos_modified` diff and the mandatory-group
-validation are centralized in a single shared PHP authority so the page and TPV
+required. Field mapping, the `descuentos_modified` diff and the validation
+(which delegates the discount-group mandate to `cliente::test()`) are
+centralized in a single shared PHP authority so the page and TPV
 save paths cannot drift. Addresses are deliberately excluded from the shared
 component (Q5); each consumer keeps its own address editor. The `tpvmod`
 contract is recorded here as a cross-repo reference; its implementation lives
@@ -224,7 +225,7 @@ artifact under the core `openspec/`.
 - GIVEN a TPV client save submitted with an empty `codgrupo`
 - WHEN the TPV save path applies the submission
 - THEN `codgrupo` is NOT set to `'000000'`
-- AND the save fails the mandatory client group validation
+- AND the save persists the client with `codgrupo = NULL` (client group is optional)
 
 #### Scenario: TPV mapping and diff come from the shared authority
 
@@ -233,4 +234,4 @@ artifact under the core `openspec/`.
 - THEN its discount diff was computed by the shared authority
 - AND `tpvmod` no longer carries an independent copy of the mapping or diff logic
 
-<!-- Source of truth. Last updated: 2026-09-23. Created from changes/cliente-form-compartido-grupos-obligatorios/specs/shared-client-form/spec.md. -->
+<!-- Source of truth. Last updated: 2026-09-28. Allow-unassigned-client-group: the client group is optional; an empty codgrupo is persisted as NULL, not rejected. -->

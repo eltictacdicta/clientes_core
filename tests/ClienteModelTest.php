@@ -34,6 +34,8 @@ class ClienteModelTest extends TestCase
         require_once FS_FOLDER . '/plugins/clientes_core/model/core/cliente.php';
 
         $this->model = new class() extends \FSFramework\model\cliente {
+            public $db;
+
             public function __construct()
             {
                 $this->nombre = '';
@@ -55,6 +57,23 @@ class ClienteModelTest extends TestCase
                 $this->d4 = null;
                 $this->descuentos_modified = false;
                 $this->codgrupo_descuento = null;
+
+                // Stub db: test() now checks the client group exists in
+                // gruposclientes whenever a codgrupo is provided.
+                $this->db = new class {
+                    /** @var array<int, array<string, string>> */
+                    public array $selectResult = [['codgrupo' => '000001']];
+
+                    public function select(string $sql, array $params = [])
+                    {
+                        return $this->selectResult;
+                    }
+
+                    public function var2str($val)
+                    {
+                        return is_null($val) ? 'NULL' : "'" . $val . "'";
+                    }
+                };
             }
             public function delete()
             {
@@ -187,7 +206,7 @@ class ClienteModelTest extends TestCase
         $this->assertSame(5.00, $discounts['d2']);
     }
 
-    public function testTestRejectsNullCodgrupo(): void
+    public function testTestAcceptsNullCodgrupo(): void
     {
         $this->model->codcliente = '000001';
         $this->model->nombre = 'Test';
@@ -197,8 +216,56 @@ class ClienteModelTest extends TestCase
         $this->model->debaja = false;
         $this->model->diaspago = '';
         $this->model->codgrupo = null;
+        $this->model->codgrupo_descuento = '000000';
 
-        $this->assertFalse($this->model->test());
+        $this->assertTrue(
+            $this->model->test(),
+            'test() must accept a client without a client group'
+        );
+        $this->assertNull($this->model->codgrupo);
+    }
+
+    public function testTestNormalizesEmptyCodgrupoToNull(): void
+    {
+        $this->model->codcliente = '000001';
+        $this->model->nombre = 'Test';
+        $this->model->razonsocial = 'Test';
+        $this->model->cifnif = '';
+        $this->model->observaciones = '';
+        $this->model->debaja = false;
+        $this->model->diaspago = '';
+        $this->model->codgrupo = '';
+        $this->model->codgrupo_descuento = '000000';
+
+        $this->assertTrue($this->model->test());
+        $this->assertNull($this->model->codgrupo, 'an empty codgrupo must be normalized to NULL');
+    }
+
+    public function testTestRejectsNonExistentCodgrupo(): void
+    {
+        $cliente = $this->makeClienteWithStubbedDb([]);
+        $cliente->codcliente = '000001';
+        $cliente->nombre = 'Test';
+        $cliente->razonsocial = 'Test';
+        $cliente->cifnif = '';
+        $cliente->observaciones = '';
+        $cliente->debaja = false;
+        $cliente->diaspago = '';
+        $cliente->codgrupo = '999999';
+        $cliente->codgrupo_descuento = '000000';
+
+        $this->assertFalse(
+            $cliente->test(),
+            'test() must reject a codgrupo that does not exist in gruposclientes'
+        );
+
+        $errors = $cliente->get_errors();
+        $this->assertNotEmpty($errors, 'a validation error must be recorded');
+        $this->assertStringContainsString(
+            'no existe',
+            mb_strtolower(implode(' ', $errors)),
+            'the failure must be a clear validation message, not a raw FK error'
+        );
     }
 
     public function testTestRejectsNullCodgrupoDescuento(): void

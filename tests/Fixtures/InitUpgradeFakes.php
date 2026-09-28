@@ -87,12 +87,6 @@ namespace FSFramework\model {
         /** If set, save() throws this on first call. */
         public static ?\Throwable $saveException = null;
 
-        /** Number of times assignOrphanClientsToGroup() was invoked. */
-        public static int $assignOrphanCalls = 0;
-
-        /** Last codgrupo passed to assignOrphanClientsToGroup(). */
-        public static ?string $assignOrphanCodgrupo = null;
-
         /** Number of times assignOrphanClientsToDiscountGroup() was invoked. */
         public static int $assignDiscountOrphanCalls = 0;
 
@@ -153,13 +147,6 @@ namespace FSFramework\model {
             return true;
         }
 
-        public function assignOrphanClientsToGroup(string $codgrupo): bool
-        {
-            self::$assignOrphanCalls++;
-            self::$assignOrphanCodgrupo = $codgrupo;
-            return true;
-        }
-
         public function assignOrphanClientsToDiscountGroup(string $codgrupoDescuento): bool
         {
             self::$assignDiscountOrphanCalls++;
@@ -199,8 +186,6 @@ namespace FSFramework\model {
             self::$table_has_rows_calls = 0;
             self::$saveCalls = 0;
             self::$saveException = null;
-            self::$assignOrphanCalls = 0;
-            self::$assignOrphanCodgrupo = null;
             self::$assignDiscountOrphanCalls = 0;
             self::$assignDiscountOrphanCodgrupo = null;
             self::$assignDiscountOrphanException = null;
