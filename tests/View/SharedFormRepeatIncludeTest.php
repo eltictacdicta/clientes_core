@@ -110,15 +110,20 @@ final class SharedFormRepeatIncludeTest extends TestCase
     }
 
     #[Test]
-    public function mandatoryGroupSelectsCarryRequiredAndModel(): void
+    public function clientGroupIsOptionalAndDiscountGroupIsMandatory(): void
     {
         $twig = $this->makeEnvironment();
         $html = $this->renderFields($twig, 'solo') . $this->renderDiscounts($twig, 'solo');
 
         self::assertMatchesRegularExpression(
-            '/<select name="codgrupo"[^>]*x-model="codgrupo"[^>]*required/',
+            '/<select name="codgrupo"[^>]*x-model="codgrupo"/',
             $html,
-            'the client-group select must be bound to Alpine and mandatory'
+            'the client-group select must be bound to Alpine'
+        );
+        self::assertDoesNotMatchRegularExpression(
+            '/<select name="codgrupo"[^>]*\srequired/',
+            $html,
+            'the client-group select must not be mandatory'
         );
         self::assertMatchesRegularExpression(
             '/<select name="codgrupo_descuento"[^>]*x-model="codgrupoDescuento"[^>]*required/',
@@ -126,16 +131,18 @@ final class SharedFormRepeatIncludeTest extends TestCase
             'the discount-group select must be bound to Alpine and mandatory'
         );
 
-        // No selectable empty option: every empty option is disabled.
-        preg_match_all('/<option value=""[^>]*>/', $html, $matches);
-        self::assertNotEmpty($matches[0]);
-        foreach ($matches[0] as $option) {
-            self::assertStringContainsString(
-                'disabled',
-                $option,
-                'an empty option must never be selectable'
-            );
-        }
+        // The client-group empty option is selectable; the discount-group
+        // empty option stays disabled.
+        self::assertStringContainsString(
+            '<option value="">— sin-grupo —</option>',
+            $html,
+            'the client-group empty option must be selectable'
+        );
+        self::assertMatchesRegularExpression(
+            '/<option value="" disabled[^>]*>— seleccione-grupo-descuentos —/',
+            $html,
+            'the discount-group empty option must remain disabled'
+        );
     }
 
     #[Test]

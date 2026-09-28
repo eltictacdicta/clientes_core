@@ -3,8 +3,10 @@
  * Shared client form — identity fields.
  *
  * Owns the client identity field set, the `cliente_form_after_main` extension
- * hook and the idempotent Alpine CSP registration for the mandatory group
- * selectors. It renders NO address editor: each consumer keeps its own (Q5).
+ * hook and the idempotent Alpine CSP registration shared with the discount
+ * block. The client group is optional (its empty "no group" option is valid);
+ * only the discount group is mandatory. It renders NO address editor: each
+ * consumer keeps its own (Q5).
  *
  * Consumers MUST put `x-data="clienteGrupoRequired"` on the element that
  * includes this partial (the <form>), so both group selects resolve inside
@@ -125,20 +127,16 @@
     </div>
     <div class="col-sm-3">
         <div class="form-group">
-            <label for="{{ id_prefix }}_codgrupo">{{ trans('grupo-cliente') }} *</label>
+            <label for="{{ id_prefix }}_codgrupo">{{ trans('grupo-cliente') }}</label>
             <select name="codgrupo" id="{{ id_prefix }}_codgrupo" class="{{ input_class }}"
-                x-model="codgrupo" required>
-                <option value="" disabled{% if not cliente or not cliente.codgrupo %} selected{% endif %}>— {{ trans('seleccione-grupo') }} —</option>
+                x-model="codgrupo">
+                <option value=""{% if not cliente or not cliente.codgrupo %} selected{% endif %}>— {{ trans('sin-grupo') }} —</option>
                 {% for g in grupos %}
                 <option value="{{ g.codgrupo }}"{% if cliente and cliente.codgrupo == g.codgrupo %} selected{% endif %}>
                     {{ g.nombre }}
                 </option>
                 {% endfor %}
             </select>
-            <p class="help-block text-danger" id="{{ id_prefix }}_grupo_required"
-                x-show="missing()" x-cloak>
-                {{ trans('grupo-obligatorio') }}
-            </p>
         </div>
     </div>
     <div class="col-sm-3">
@@ -221,8 +219,9 @@
                     if (d) { this.codgrupoDescuento = d.value || ''; }
                 },
                 missing: function () {
-                    return this.codgrupo === '' || this.codgrupo === null
-                        || this.codgrupoDescuento === '' || this.codgrupoDescuento === null;
+                    // Only the discount group is mandatory; a client group is
+                    // optional and its empty "no group" option is valid.
+                    return this.codgrupoDescuento === '' || this.codgrupoDescuento === null;
                 },
                 // Instant d1-d4 fill from the selected discount-group option
                 // (data-d1..d4) so the form never needs a full reload to show

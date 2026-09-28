@@ -10,8 +10,9 @@
  * The owning `<form>` element stays in the consumer: the create modal must
  * keep its Bootstrap header/body/footer layout and the edit page owns its own
  * form element and id (design §5.3, §6.1). The consumer puts
- * `x-data="clienteGrupoRequired"` on that `<form>` so both mandatory group
- * selects resolve inside the Alpine component root.
+ * `x-data="clienteGrupoRequired"` on that `<form>` so both group selects
+ * resolve inside the Alpine component root; only the discount group is
+ * mandatory, while the client group is optional.
  *
  * Every DOM id emitted by this partial chain is namespaced by `id_prefix`
  * (R7); no consumer/legacy id is hard-coded.

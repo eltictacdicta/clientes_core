@@ -16,9 +16,10 @@ use Twig\TwigFunction;
 /**
  * View contract: both clientes_core surfaces render the shared client form.
  *
- * The client group and the discount group are mandatory, so creating a client
- * without them is blocked client-side (Alpine CSP build) as well as
- * server-side by `cliente::test()`. This test binds the parameterization
+ * The discount group is mandatory, so creating a client without it is blocked
+ * client-side (Alpine CSP build) as well as server-side by `cliente::test()`.
+ * The client group is optional: its empty "no group" option is selectable and
+ * is not part of the `missing()` gate. This test binds the parameterization
  * contract (create vs edit mode, `id_prefix`, DOM id ownership) of the shared
  * partial added in Slice 2b and asserts that neither consumer keeps a private
  * copy of the field markup or the Alpine registration script.
@@ -229,9 +230,9 @@ final class ClienteGrupoRequiredViewTest extends TestCase
             'create mode must render an empty entity'
         );
         self::assertMatchesRegularExpression(
-            '/<option value=""[^>]*selected[^>]*>— seleccione-grupo —/',
+            '/<option value=""[^>]*selected[^>]*>— sin-grupo —/',
             $html,
-            'create mode must not preselect a client group'
+            'create mode must render the neutral "no group" client option as selected'
         );
         self::assertStringNotContainsString(
             '<input type="hidden" name="codcliente"',
@@ -285,7 +286,7 @@ final class ClienteGrupoRequiredViewTest extends TestCase
     }
 
     #[Test]
-    public function bothGroupSelectsCarryRequiredAndAlpineBindings(): void
+    public function clientGroupSelectIsOptionalAndDiscountSelectIsRequired(): void
     {
         $html = $this->renderForm([
             'mode' => 'edit',
@@ -293,9 +294,14 @@ final class ClienteGrupoRequiredViewTest extends TestCase
         ]);
 
         self::assertMatchesRegularExpression(
-            '/<select\s+name="codgrupo"[^>]*x-model="codgrupo"[^>]*required/',
+            '/<select\s+name="codgrupo"[^>]*x-model="codgrupo"/',
             $html,
-            'the client-group select must be bound to Alpine and mandatory'
+            'the client-group select must be bound to Alpine'
+        );
+        self::assertDoesNotMatchRegularExpression(
+            '/<select\s+name="codgrupo"[^>]*\srequired/',
+            $html,
+            'the client-group select must not be mandatory'
         );
         self::assertMatchesRegularExpression(
             '/<select\s+name="codgrupo_descuento"[^>]*x-model="codgrupoDescuento"[^>]*required/',
@@ -309,16 +315,18 @@ final class ClienteGrupoRequiredViewTest extends TestCase
         self::assertStringContainsString('data-d4=', $html);
         self::assertStringContainsString('applyGroupDiscountsFromSelect', $html);
 
-        // No selectable empty option: every empty option is disabled.
-        preg_match_all('/<option value=""[^>]*>/', $html, $matches);
-        self::assertNotEmpty($matches[0]);
-        foreach ($matches[0] as $option) {
-            self::assertStringContainsString(
-                'disabled',
-                $option,
-                'an empty group option must never be selectable'
-            );
-        }
+        // The client-group empty option is selectable ("no group"); the
+        // discount-group empty option stays disabled.
+        self::assertStringContainsString(
+            '<option value="">— sin-grupo —</option>',
+            $html,
+            'the client-group empty option must be selectable and labelled "sin-grupo"'
+        );
+        self::assertMatchesRegularExpression(
+            '/<option value="" disabled[^>]*>— seleccione-grupo-descuentos —/',
+            $html,
+            'the discount-group empty option must remain disabled'
+        );
     }
 
     /**
