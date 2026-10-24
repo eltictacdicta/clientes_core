@@ -29,8 +29,8 @@ class grupo_clientes extends \fs_model
     private const PK_WHERE = ' WHERE codgrupo = ';
 
     /**
-     * Clave primaria
-     * @var string
+     * Clave primaria. NULL mientras el grupo no se ha guardado todavía.
+     * @var string|null
      */
     public $codgrupo;
 
@@ -42,7 +42,7 @@ class grupo_clientes extends \fs_model
 
     /**
      * Código de la tarifa asociada, si la hay
-     * @var string 
+     * @var string|null
      */
     public $codtarifa;
 
@@ -55,7 +55,7 @@ class grupo_clientes extends \fs_model
             $this->codtarifa = $data['codtarifa'];
         } else {
             $this->codgrupo = NULL;
-            $this->nombre = NULL;
+            $this->nombre = '';
             $this->codtarifa = NULL;
         }
     }

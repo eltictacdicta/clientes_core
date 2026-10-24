@@ -31,13 +31,15 @@ class cuenta_banco_cliente extends fs_model
 
     /**
      * Clave primaria. Varchar(6).
-     * @var string
+     * NULL mientras la cuenta no se ha guardado todavía.
+     * @var string|null
      */
     public $codcuenta;
 
     /**
-     * Código del cliente.
-     * @var string
+     * Código del cliente. NULL en una cuenta recién creada y aún sin cliente
+     * asignado; url() lo contempla y devuelve '#' en ese caso.
+     * @var string|null
      */
     public $codcliente;
     public $descripcion;
@@ -52,7 +54,8 @@ class cuenta_banco_cliente extends fs_model
 
     /**
      * Fecha en la que se firmó el mandato para autorizar la domiciliación de recibos.
-     * @var string
+     * NULL cuando no hay mandato firmado.
+     * @var string|null
      */
     public $fmandato;
 

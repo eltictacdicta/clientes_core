@@ -30,8 +30,8 @@ class grupo_descuentos extends \fs_model
     private const PK_WHERE = ' WHERE codgrupo_descuento = ';
 
     /**
-     * Clave primaria
-     * @var string
+     * Clave primaria. NULL mientras el grupo no se ha guardado todavía.
+     * @var string|null
      */
     public $codgrupo_descuento;
 
@@ -65,7 +65,7 @@ class grupo_descuentos extends \fs_model
             $this->d4 = array_key_exists('d4', $data) && $data['d4'] !== null ? (float) $data['d4'] : null;
         } else {
             $this->codgrupo_descuento = NULL;
-            $this->nombre = NULL;
+            $this->nombre = '';
             $this->d1 = NULL;
             $this->d2 = NULL;
             $this->d3 = NULL;

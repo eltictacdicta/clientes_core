@@ -45,7 +45,8 @@ class cliente extends \fs_model
 
     /**
      * Clave primaria. Varchar (6).
-     * @var string 
+     * NULL mientras el cliente no se ha guardado todavía.
+     * @var string|null
      */
     public $codcliente;
 
@@ -81,7 +82,7 @@ class cliente extends \fs_model
 
     /**
      * Serie predeterminada para este cliente.
-     * @var string 
+     * @var string|null
      */
     public $codserie;
 
@@ -99,13 +100,14 @@ class cliente extends \fs_model
 
     /**
      * Empleado/agente asignado al cliente.
-     * @var string 
+     * @var string|null
      */
     public $codagente;
 
     /**
-     * Grupo al que pertenece el cliente.
-     * @var string 
+     * Grupo al que pertenece el cliente. Es opcional: un cliente puede no
+     * tener grupo, y el string vacío se normaliza a NULL en test().
+     * @var string|null
      */
     public $codgrupo;
 
@@ -116,14 +118,14 @@ class cliente extends \fs_model
     public $debaja;
 
     /**
-     * Fecha en la que se dió de baja al cliente.
-     * @var string 
+     * Fecha en la que se dió de baja al cliente. NULL mientras no esté de baja.
+     * @var string|null
      */
     public $fechabaja;
 
     /**
      * Fecha en la que se dió de alta al cliente.
-     * @var string 
+     * @var string|null
      */
     public $fechaalta;
     public $observaciones;
@@ -151,20 +153,20 @@ class cliente extends \fs_model
     /**
      * Dias de pago preferidos a la hora de calcular el vencimiento de las facturas.
      * Días separados por comas: 1,15,31
-     * @var string 
+     * @var string|null
      */
     public $diaspago;
 
     /**
      * Proveedor asociado equivalente.
      * Integración opcional: solo se usa si el plugin de facturación está presente.
-     * @var string
+     * @var string|null
      */
     public $codproveedor;
 
     /**
      * Código de la tarifa para este cliente
-     * @var string
+     * @var string|null
      */
     public $codtarifa;
 
@@ -244,7 +246,10 @@ class cliente extends \fs_model
             $this->codcliente = NULL;
             $this->nombre = '';
             $this->razonsocial = '';
-            $this->tipoidfiscal = FS_CIFNIF;
+            // FS_CIFNIF es una constante opcional de config.php. Si el operador no
+            // la define usamos el mismo valor por defecto que la columna
+            // tipoidfiscal en clientes.xml, en lugar de provocar un fatal.
+            $this->tipoidfiscal = defined('FS_CIFNIF') ? FS_CIFNIF : 'NIF';
             $this->cifnif = '';
             $this->telefono1 = '';
             $this->telefono2 = '';
@@ -380,7 +385,8 @@ class cliente extends \fs_model
 
     /**
      * @param string $cifnif
-     * @param string $razon
+     * @param string|false $razon Razón social a comparar cuando $cifnif viene vacío.
+     *                            FALSE consulta solo por CIF/NIF.
      * @return boolean|\cliente
      */
     public function get_by_cifnif($cifnif, $razon = FALSE)
@@ -506,14 +512,12 @@ class cliente extends \fs_model
             return false;
         }
 
-        $nombre = (string) ($this->nombre ?? '');
-        if (strlen($nombre) < 1 || strlen($nombre) > 100) {
+        if (strlen($this->nombre) < 1 || strlen($this->nombre) > 100) {
             $this->new_error_msg("Nombre de cliente no válido: " . $this->nombre);
             return false;
         }
 
-        $razonsocial = (string) ($this->razonsocial ?? '');
-        if (strlen($razonsocial) > 100) {
+        if (strlen($this->razonsocial) > 100) {
             $this->new_error_msg("Razón social del cliente no válida: " . $this->razonsocial);
             return false;
         }
@@ -532,8 +536,7 @@ class cliente extends \fs_model
             return false;
         }
 
-        $cifnif = (string) ($this->cifnif ?? '');
-        if (strlen($cifnif) > 30) {
+        if (strlen($this->cifnif) > 30) {
             $this->new_error_msg("CIF/NIF no válido: longitud excedida.");
             return false;
         }

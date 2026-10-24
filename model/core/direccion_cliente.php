@@ -31,14 +31,15 @@ class direccion_cliente extends \fs_model
     private const FK_WHERE_CLIENTE = ' WHERE codcliente = ';
 
     /**
-     * Clave primaria.
-     * @var integer
+     * Clave primaria. NULL mientras la dirección no se ha guardado todavía.
+     * @var integer|null
      */
     public $id;
 
     /**
-     * Código del cliente asociado.
-     * @var string 
+     * Código del cliente asociado. NULL en una dirección recién creada y aún
+     * sin cliente asignado; test() rechaza guardarla sin código.
+     * @var string|null
      */
     public $codcliente;
     public $codpais;
