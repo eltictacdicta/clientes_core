@@ -39,6 +39,17 @@ final class GroupKeysParityTest extends TestCase
             'en' => 'Select a discount group',
             'es' => 'Seleccione un grupo de descuentos',
         ],
+        # The shared discounts partial rendered the raw keys for every consumer
+        # (both locales) before this pin: the panel title and the "modified"
+        # badge showed the identifier instead of the label.
+        'descuentos' => [
+            'en' => 'Discounts',
+            'es' => 'Descuentos',
+        ],
+        'modificado' => [
+            'en' => 'Modified',
+            'es' => 'Modificado',
+        ],
     ];
 
     /**
